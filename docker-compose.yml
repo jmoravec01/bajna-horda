@@ -1,0 +1,26 @@
+services:
+  bajna-horda:
+    build: .
+    image: bajna-horda:latest
+    container_name: bajna-horda
+    restart: unless-stopped
+    ports:
+      - "${HORDE_PORT:-8078}:8080"
+    environment:
+      # 1 behind a reverse proxy (Caddy, nginx ...): rate limits then use the proxy's X-Forwarded-For
+      TRUST_PROXY: "${TRUST_PROXY:-0}"
+      # pages allowed to call the API from another origin, e.g. a GitHub Pages copy: https://you.github.io
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+    volumes:
+      - horde-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 384m
+    cpus: 1.5
+volumes:
+  horde-data:

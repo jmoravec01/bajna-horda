@@ -1,4 +1,4 @@
-// Pixel Horde server: static files, JSON API (accounts, characters, single-player runs) and co-op WebSockets. No npm dependencies.
+// Bájná horda server: static files, JSON API (accounts, characters, single-player runs) and co-op WebSockets. No npm dependencies.
 import http from 'node:http';
 import { isIP } from 'node:net';
 import { readFileSync, statSync } from 'node:fs';
@@ -196,5 +196,5 @@ server.on('upgrade', (req, socket) => {
 });
 process.on('uncaughtException', (e) => console.error('uncaught', e));
 process.on('unhandledRejection', (e) => console.error('unhandled', e));
-server.listen(PORT, HOST, () => console.log(`pixel-horde listening on ${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => console.log(`bajna-horda listening on ${HOST}:${PORT}`));
 export { server };

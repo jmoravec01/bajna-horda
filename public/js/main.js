@@ -47,7 +47,7 @@ const SCREENS = {
     music('menu'); S.args = [];
     const parade = ['krakonos', 'zbojnik', 'perun', 'cert', 'vedma', 'baba'].map((c) => heroCv(c, 4)).join('');
     view(`<div class="screen title"><div class="top"><span></span><span></span><span></span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">${isMuted() ? '×' : '♪'}</button></div>
-      <h1 class="logo">PIXEL<br>HORDE</h1><p class="sub">${t('sub')}</p><div class="parade">${parade}</div>
+      <h1 class="logo">BÁJNÁ<br>HORDA</h1><p class="sub">${t('sub')}</p><div class="parade">${parade}</div>
       ${OFFLINE ? `<p class="note">${t('offline_note')}</p>` : `<form class="auth" autocomplete="on"><input name="nick" maxlength="16" placeholder="${t('nick')}" autocomplete="username" required><input name="pass" type="password" placeholder="${t('pass')}" autocomplete="current-password" minlength="6" required>
         <div class="row"><button class="btn" data-act="login" type="submit">${t('login')}</button><button class="btn alt" data-act="register" type="button">${t('register')}</button></div></form>`}
       <p class="msg"></p><button class="btn ghost" data-act="guest">${t('guest')}</button><p class="note">${t('guest_note')}</p></div>`, (root) => {
@@ -237,4 +237,5 @@ async function boot() {
   try { if (await profile.load()) { return afterLogin(); } } catch { /* server down: fall through to the title screen */ }
   go('title');
 }
+window.__horde = S;   // QA handle
 boot();

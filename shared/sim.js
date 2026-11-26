@@ -243,7 +243,7 @@ export class Sim {
     const tsHp = 1 + T / 60 * 0.6, tsDmg = 1 + T / 60 * 0.12;
     const hp = hpBase * (boss ? 1 : tsHp) * this.eMul * d.diff;
     const e = { id: this.nid++, type: idx, arch, beh: arch.beh, x: target.x + Math.cos(a) * dist, y: target.y + Math.sin(a) * dist,
-      hp, maxHp: hp, dmg: arch.dmg * (boss ? 1.3 : 1) * tsDmg * this.dMul * d.diff, spd: arch.spd * (boss ? 0.8 : 1) * (1 + this.rnd() * 0.12), r: arch.r * scale, xp: arch.xp * (elite ? 6 : 1),
+      hp, maxHp: hp, dmg: arch.dmg * (boss ? 1.3 : 1) * tsDmg * this.dMul * Math.sqrt(d.diff), spd: arch.spd * (boss ? 0.8 : 1) * (1 + this.rnd() * 0.12), r: arch.r * scale, xp: arch.xp * (elite ? 6 : 1),
       kx: 0, ky: 0, t: this.rnd() * 3, dead: false, flash: 0, slowUntil: 0, slowF: 0, freezeUntil: 0, hm: null, boss, elite, big: arch.r * scale >= 8, st: 0, dashX: 0, dashY: 0 };
     if (boss) { e.beh = 'boss'; e.bt = 3; e.bs = 8; e.xp = 0; }
     this.enemies.push(e);

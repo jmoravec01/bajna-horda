@@ -122,7 +122,7 @@ export function render(ctx, W, H, sc, now, lastDir) {
       const moving = e[0] === sc.meId ? lastDir : 1, fr = (moving && !e[5]) ? (Math.floor(now / 140) & 1) : 0, spr = heroSprite(pl.cls, fr);
       const px = sx(x), py = sy(y);
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(px - 5, py + 7, 10, 2);
-      if (e[7] && (now / 70 | 0) % 2) continue;                  // invulnerability flicker
+      if (e[7] && (now / 90 | 0) % 3 === 0) continue;                  // invulnerability flicker
       ctx.save(); ctx.translate(px, py - 1);
       if (e[6] < 0) ctx.scale(-1, 1);
       if (e[5]) { ctx.globalAlpha = 0.45; ctx.rotate(Math.PI / 2); ctx.drawImage(spr, -(spr.width >> 1), -(spr.height >> 1) + 2); }

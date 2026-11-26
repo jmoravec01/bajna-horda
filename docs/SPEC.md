@@ -1,4 +1,4 @@
-# Pixel Horde — spec v0.1 (pracovní název)
+# Bájná horda — spec v0.1 (pracovní název)
 
 Pixel-art survivor hra pro mobil v prohlížeči (inspirace: Survivor.io). Ovládání jedním palcem, útoky automaticky.
 
@@ -57,7 +57,7 @@ Pixel-art survivor hra pro mobil v prohlížeči (inspirace: Survivor.io). Ovlá
 
 ## 4. Multiplayer
 - Každý hráč má **vlastní místnost** (kód 5 znaků + odkaz `#/room/KOD`). Kamarádi se připojí, hrají tvůj dungeon (ten, který máš ty odemčený). Host si vybere dungeon a spustí run. Kdokoli může odejít kdykoli.
-- Real-time, server je autorita (RPi), WebSocket: klient posílá směr pohybu (20 Hz), server simuluje a posílá snapshoty (10 Hz) jen z okolí hráče; klient predikuje svého hráče a ostatní interpoluje.
+- Real-time, server je autorita, WebSocket: klient posílá směr pohybu (20 Hz), server simuluje a posílá snapshoty (10 Hz) jen z okolí hráče; klient predikuje svého hráče a ostatní interpoluje.
 - **Škálování obtížnosti** — „level 1 s level 100 je těžší než level 1 s level 20“:
   `threat = nejvyšší power ve skupině × (1 + 0,25 × (počet hráčů − 1))`
   `power = f(level postavy, úroveň výbavy)`. HP a poškození příšer i jejich počet rostou s `threat`, ne s power jednotlivce. Slabý hráč ve skupině se silným tedy dostane těžší hru.
@@ -72,8 +72,8 @@ Pixel-art survivor hra pro mobil v prohlížeči (inspirace: Survivor.io). Ovlá
 ## 5. Technika
 - Klient: vanilla ES moduly + `<canvas>`, bez build stepu, bez npm závislostí. Sprity jako pixel mapy v kódu (žádné stažené assety), generované atlasy. Zvuk Web Audio syntezátor. CZ/EN UI.
 - `shared/sim.js`: deterministická simulace (pevný krok 20 Hz) — stejný kód v prohlížeči (Single) i na serveru (Multiplayer).
-- Server: Node `node:http` + `node:sqlite` + vlastní WebSocket (RFC 6455), alpine image (~110 MB), Dockhand stack, tag, dlaždice na homepage.
-- Hosting: statický klient na **GitHub Pages** (`jmoravec01.github.io/<repo>`), server na makině přes Tailscale Funnel (`/horde`, WebSocket `wss://…/horde/ws`), LAN instance na portu 8078. CORS jen pro github.io.
+- Server: Node `node:http` + `node:sqlite` + vlastní WebSocket (RFC 6455).
+- Hosting: statický klient na **GitHub Pages** (`jmoravec01.github.io/<repo>`), server přes reverzní proxy s HTTPS (WebSocket `wss://…/ws`). CORS jen pro github.io.
 - Chyby na mobilu: dpr cap, adaptivní kvalita, ≤150 příšer na hráče, pooling entit, žádné alokace v herní smyčce.
 - Testy (`node --test`): sim determinismus, škálování obtížnosti, API (registrace/přihlášení/run), WS protokol, flood/malformed zprávy. Smoke test v Playwright WebKit + Chromium (mobilní emulace).
 
@@ -81,11 +81,10 @@ Pixel-art survivor hra pro mobil v prohlížeči (inspirace: Survivor.io). Ovlá
 1. **M1 — Single jádro:** sim, 1 dungeon, 3 zbraně, joystick, pixel art, level-up výběr. Hratelné lokálně.
 2. **M2 — Obsah + meta:** 6 zbraní/6 pasivek, 3 single dungeony, boss, účet, postava, výbava, mince.
 3. **M3 — Multiplayer:** místnosti, WS, server sim, škálování `threat`, 3 co-op dungeony, oživení.
-4. **M4 — Nasazení:** Docker + Dockhand + Funnel + GitHub Pages + CI.
+4. **M4 — Nasazení:** Docker + GitHub Pages + CI.
 5. **M5 — Leštění:** zvuk, balanc, QA na mobilním emulátoru + nezávislé review.
 
 ## 7. Předpoklady, které jsem udělal (řekni, když chceš jinak)
-- Název „Pixel Horde“ je pracovní; „Survivor.io“ v názvu ani textech nebude (ochranná známka).
+- Název „Survivor.io“ v názvu ani textech nebude (ochranná známka).
 - Max 6 hráčů v místnosti.
-- Repo bude veřejné na GitHubu pod tvým noreply e-mailem, bez zmínek o AI a o domácí infrastruktuře.
 - Žádné platby/reklamy/gacha.

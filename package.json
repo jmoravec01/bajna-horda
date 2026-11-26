@@ -1,1 +1,1 @@
-{"type":"module","name":"pixel-horde","version":"0.1.0","private":true,"scripts":{"start":"node server/server.js","test":"node --test test/*.test.js"}}
+{"type":"module","name":"bajna-horda","version":"0.1.0","private":true,"scripts":{"start":"node server/server.js","test":"node --test test/*.test.js"}}

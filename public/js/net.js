@@ -4,7 +4,7 @@ import { newProfile, createChar, upgradeEquip, applyRun } from '../shared/meta.j
 const META = document.querySelector('meta[name="horde-api"]')?.content || '';
 export const OFFLINE = META === 'none';
 const BASE = OFFLINE ? '' : (META || location.origin + location.pathname.replace(/[^/]*$/, ''));   // always ends with "/"
-const KEY = 'pixelhorde.v1';
+const KEY = 'bajnahorda.v1';
 
 export const store = {
   d: { lang: null, muted: false, token: null, user: null, guest: null, active: null },
