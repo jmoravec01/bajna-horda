@@ -1,0 +1,14 @@
+[request]
+method = "POST"
+path = "/api/run/finish"
+body = '{"ticket": "1.1.s1.1.x.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "kills": 1, "coins": 0, "time": 1, "cleared": false}'
+
+[request.headers]
+Authorization = "Bearer recording-token-0001"
+Content-Type = "application/json"
+
+[response]
+status = 401
+
+[response.headers]
+content-type = "application/json"

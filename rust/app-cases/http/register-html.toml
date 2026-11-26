@@ -1,0 +1,13 @@
+[request]
+method = "POST"
+path = "/api/register"
+body = '{"name": "<b>x</b>", "pass": "secret1"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 400
+
+[response.headers]
+content-type = "application/json"

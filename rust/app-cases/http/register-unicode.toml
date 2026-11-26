@@ -1,0 +1,14 @@
+[request]
+method = "POST"
+path = "/api/register"
+body = '{"name": "\u010cen\u011bk \u017dlu\u0165ou\u010dk\u00fd", "pass": "heslo123"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-store"
+content-type = "application/json"

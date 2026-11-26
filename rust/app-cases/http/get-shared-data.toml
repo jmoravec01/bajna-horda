@@ -1,0 +1,11 @@
+[request]
+method = "GET"
+path = "/shared/data.js"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-cache"
+content-type = "text/javascript; charset=utf-8"
+x-content-type-options = "nosniff"

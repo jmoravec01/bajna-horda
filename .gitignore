@@ -26,3 +26,6 @@ Thumbs.db
 # static build (tools/build-pages.sh)
 _site/
 .wk-*
+server-rs/target/
+.rec/
+rust/app-cases/replay-report.md

@@ -1,0 +1,602 @@
+{
+ "consts": {
+  "DT": 0.05,
+  "MAX_CHARS": 8,
+  "MAX_PLAYERS": 6,
+  "RUN_SECONDS": 480,
+  "BOSS_AT": 390,
+  "MAX_LEVEL": 100,
+  "MAX_WEAPONS": 5,
+  "MAX_PASSIVES": 5,
+  "MAX_ITEM_LVL": 8,
+  "MAX_EQUIP": 20
+ },
+ "classes": [
+  {
+   "id": "krakonos",
+   "weapon": "hul",
+   "hp": 1.35,
+   "spd": 0.9,
+   "dmg": 1,
+   "armor": 0.85
+  },
+  {
+   "id": "zbojnik",
+   "weapon": "valaska",
+   "hp": 0.85,
+   "spd": 1.2,
+   "dmg": 1,
+   "crit": 0.2
+  },
+  {
+   "id": "perun",
+   "weapon": "blesk",
+   "hp": 1,
+   "spd": 1,
+   "dmg": 0.9,
+   "healAura": 1.5,
+   "magnet": 1.3
+  },
+  {
+   "id": "cert",
+   "weapon": "peklo",
+   "hp": 0.75,
+   "spd": 1,
+   "dmg": 1.25,
+   "burn": 0.25,
+   "armor": 1.2
+  },
+  {
+   "id": "bohatyr",
+   "weapon": "kyj",
+   "hp": 1.1,
+   "spd": 1,
+   "dmg": 1,
+   "xp": 1.2
+  },
+  {
+   "id": "vedma",
+   "weapon": "jed",
+   "hp": 1,
+   "spd": 1,
+   "dmg": 0.95,
+   "regen": 1,
+   "heartLuck": 2
+  },
+  {
+   "id": "hastrman",
+   "weapon": "louze",
+   "hp": 1,
+   "spd": 1,
+   "dmg": 0.95,
+   "zoneSlow": 0.4,
+   "swim": 1.1
+  },
+  {
+   "id": "polednice",
+   "weapon": "poledne",
+   "hp": 0.95,
+   "spd": 1,
+   "dmg": 1,
+   "ramp": 1
+  },
+  {
+   "id": "golem",
+   "weapon": "pest",
+   "hp": 1.7,
+   "spd": 0.75,
+   "dmg": 1,
+   "armor": 0.9,
+   "knock": 1.5
+  },
+  {
+   "id": "rarasek",
+   "weapon": "cepice",
+   "hp": 0.9,
+   "spd": 1.05,
+   "dmg": 1,
+   "dodge": 0.15,
+   "coins": 1.3,
+   "blink": 1
+  },
+  {
+   "id": "morana",
+   "weapon": "led",
+   "hp": 0.95,
+   "spd": 1,
+   "dmg": 0.85,
+   "freeze": 1
+  },
+  {
+   "id": "baba",
+   "weapon": "chaloupka",
+   "hp": 1,
+   "spd": 0.95,
+   "dmg": 0.75,
+   "extra": 1
+  }
+ ],
+ "weapons": [
+  {
+   "id": "hul",
+   "kind": "orbit",
+   "dmg": 7,
+   "cd": 0,
+   "count": 2,
+   "area": 24,
+   "speed": 2.6,
+   "grow": [
+    "count"
+   ]
+  },
+  {
+   "id": "valaska",
+   "kind": "proj",
+   "dmg": 9,
+   "cd": 0.9,
+   "count": 1,
+   "speed": 120,
+   "dur": 1.4,
+   "pierce": 1,
+   "area": 4,
+   "grow": [
+    "count",
+    "pierce"
+   ]
+  },
+  {
+   "id": "blesk",
+   "kind": "chain",
+   "dmg": 11,
+   "cd": 1.5,
+   "count": 3,
+   "area": 70,
+   "grow": [
+    "count"
+   ]
+  },
+  {
+   "id": "peklo",
+   "kind": "bomb",
+   "dmg": 20,
+   "cd": 2.2,
+   "count": 1,
+   "area": 24,
+   "dur": 0.7,
+   "burn": 0.3,
+   "grow": [
+    "count",
+    "area"
+   ]
+  },
+  {
+   "id": "kyj",
+   "kind": "pulse",
+   "dmg": 14,
+   "cd": 1.8,
+   "area": 34,
+   "knock": 14,
+   "grow": [
+    "area"
+   ]
+  },
+  {
+   "id": "jed",
+   "kind": "zone",
+   "dmg": 4,
+   "cd": 3.5,
+   "count": 1,
+   "area": 22,
+   "dur": 4,
+   "tick": 0.5,
+   "grow": [
+    "count",
+    "area"
+   ]
+  },
+  {
+   "id": "louze",
+   "kind": "zone",
+   "dmg": 2,
+   "cd": 4,
+   "count": 1,
+   "area": 26,
+   "dur": 5,
+   "tick": 0.5,
+   "slow": 0.25,
+   "grow": [
+    "count",
+    "area"
+   ]
+  },
+  {
+   "id": "poledne",
+   "kind": "pulse",
+   "dmg": 8,
+   "cd": 1.1,
+   "area": 40,
+   "knock": 0,
+   "grow": [
+    "area"
+   ]
+  },
+  {
+   "id": "pest",
+   "kind": "pulse",
+   "dmg": 22,
+   "cd": 2.4,
+   "area": 26,
+   "knock": 26,
+   "grow": [
+    "area"
+   ]
+  },
+  {
+   "id": "cepice",
+   "kind": "boomerang",
+   "dmg": 8,
+   "cd": 1.6,
+   "count": 1,
+   "speed": 95,
+   "dur": 1.6,
+   "area": 6,
+   "grow": [
+    "count"
+   ]
+  },
+  {
+   "id": "led",
+   "kind": "proj",
+   "dmg": 6,
+   "cd": 1,
+   "count": 2,
+   "speed": 110,
+   "dur": 1.2,
+   "pierce": 0,
+   "area": 4,
+   "slow": 0.5,
+   "grow": [
+    "count"
+   ]
+  },
+  {
+   "id": "chaloupka",
+   "kind": "turret",
+   "dmg": 8,
+   "cd": 6,
+   "count": 1,
+   "speed": 100,
+   "dur": 10,
+   "rate": 1.3,
+   "area": 8,
+   "grow": [
+    "count",
+    "dur"
+   ]
+  }
+ ],
+ "passives": [
+  "srdce",
+  "boty",
+  "sila",
+  "spech",
+  "magnet",
+  "moudrost"
+ ],
+ "arch": {
+  "slime": {
+   "hp": 8,
+   "dmg": 6,
+   "spd": 22,
+   "r": 5,
+   "xp": 1,
+   "beh": "chase"
+  },
+  "bat": {
+   "hp": 5,
+   "dmg": 5,
+   "spd": 40,
+   "r": 4,
+   "xp": 1,
+   "beh": "zig"
+  },
+  "skel": {
+   "hp": 14,
+   "dmg": 8,
+   "spd": 26,
+   "r": 5,
+   "xp": 2,
+   "beh": "chase"
+  },
+  "wolf": {
+   "hp": 12,
+   "dmg": 9,
+   "spd": 42,
+   "r": 5,
+   "xp": 2,
+   "beh": "chase"
+  },
+  "spider": {
+   "hp": 10,
+   "dmg": 7,
+   "spd": 28,
+   "r": 5,
+   "xp": 2,
+   "beh": "shoot"
+  },
+  "ghost": {
+   "hp": 16,
+   "dmg": 10,
+   "spd": 24,
+   "r": 5,
+   "xp": 3,
+   "beh": "ghost"
+  },
+  "ogre": {
+   "hp": 60,
+   "dmg": 16,
+   "spd": 17,
+   "r": 9,
+   "xp": 8,
+   "beh": "chase"
+  },
+  "boar": {
+   "hp": 26,
+   "dmg": 14,
+   "spd": 24,
+   "r": 7,
+   "xp": 5,
+   "beh": "dash"
+  },
+  "imp": {
+   "hp": 9,
+   "dmg": 8,
+   "spd": 33,
+   "r": 5,
+   "xp": 2,
+   "beh": "shoot"
+  }
+ },
+ "dungeons": [
+  {
+   "id": "s1",
+   "mode": "single",
+   "diff": 1,
+   "xp": 1,
+   "roster": [
+    {
+     "arch": "slime",
+     "at": 0,
+     "weight": 6
+    },
+    {
+     "arch": "bat",
+     "at": 40,
+     "weight": 3
+    },
+    {
+     "arch": "wolf",
+     "at": 100,
+     "weight": 3
+    },
+    {
+     "arch": "boar",
+     "at": 190,
+     "weight": 2
+    },
+    {
+     "arch": "ogre",
+     "at": 280,
+     "weight": 1
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "ogre",
+    "hp": 1800,
+    "scale": 2.6
+   }
+  },
+  {
+   "id": "s2",
+   "mode": "single",
+   "diff": 1.35,
+   "xp": 1.3,
+   "roster": [
+    {
+     "arch": "skel",
+     "at": 0,
+     "weight": 6
+    },
+    {
+     "arch": "bat",
+     "at": 30,
+     "weight": 3
+    },
+    {
+     "arch": "ghost",
+     "at": 90,
+     "weight": 3
+    },
+    {
+     "arch": "spider",
+     "at": 170,
+     "weight": 2
+    },
+    {
+     "arch": "ogre",
+     "at": 270,
+     "weight": 1
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "skel",
+    "hp": 2600,
+    "scale": 3
+   }
+  },
+  {
+   "id": "s3",
+   "mode": "single",
+   "diff": 1.8,
+   "xp": 1.7,
+   "roster": [
+    {
+     "arch": "imp",
+     "at": 0,
+     "weight": 6
+    },
+    {
+     "arch": "bat",
+     "at": 30,
+     "weight": 3
+    },
+    {
+     "arch": "wolf",
+     "at": 90,
+     "weight": 3
+    },
+    {
+     "arch": "boar",
+     "at": 170,
+     "weight": 2
+    },
+    {
+     "arch": "ogre",
+     "at": 260,
+     "weight": 1
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "ogre",
+    "hp": 3600,
+    "scale": 2.6
+   }
+  },
+  {
+   "id": "m1",
+   "mode": "multi",
+   "diff": 1.2,
+   "xp": 1.2,
+   "roster": [
+    {
+     "arch": "slime",
+     "at": 0,
+     "weight": 6
+    },
+    {
+     "arch": "bat",
+     "at": 20,
+     "weight": 4
+    },
+    {
+     "arch": "spider",
+     "at": 70,
+     "weight": 3
+    },
+    {
+     "arch": "wolf",
+     "at": 140,
+     "weight": 3
+    },
+    {
+     "arch": "ogre",
+     "at": 240,
+     "weight": 1.5
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "spider",
+    "hp": 3200,
+    "scale": 3.4
+   }
+  },
+  {
+   "id": "m2",
+   "mode": "multi",
+   "diff": 1.5,
+   "xp": 1.5,
+   "roster": [
+    {
+     "arch": "slime",
+     "at": 0,
+     "weight": 6
+    },
+    {
+     "arch": "ghost",
+     "at": 30,
+     "weight": 3
+    },
+    {
+     "arch": "spider",
+     "at": 80,
+     "weight": 3
+    },
+    {
+     "arch": "boar",
+     "at": 150,
+     "weight": 2.5
+    },
+    {
+     "arch": "ogre",
+     "at": 250,
+     "weight": 1.5
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "slime",
+    "hp": 4200,
+    "scale": 3.6
+   }
+  },
+  {
+   "id": "m3",
+   "mode": "multi",
+   "diff": 1.9,
+   "xp": 2,
+   "roster": [
+    {
+     "arch": "imp",
+     "at": 0,
+     "weight": 6
+    },
+    {
+     "arch": "wolf",
+     "at": 25,
+     "weight": 4
+    },
+    {
+     "arch": "ghost",
+     "at": 80,
+     "weight": 3
+    },
+    {
+     "arch": "boar",
+     "at": 150,
+     "weight": 2.5
+    },
+    {
+     "arch": "ogre",
+     "at": 240,
+     "weight": 1.5
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "ogre",
+    "hp": 5200,
+    "scale": 2.8
+   }
+  }
+ ],
+ "slots": [
+  "weapon",
+  "armor",
+  "ring",
+  "boots"
+ ]
+}

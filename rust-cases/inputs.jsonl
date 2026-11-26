@@ -1,0 +1,49 @@
+{"name": "get-index", "method": "GET", "path": "/"}
+{"name": "get-css", "method": "GET", "path": "/style.css"}
+{"name": "get-main-js", "method": "GET", "path": "/js/main.js"}
+{"name": "get-shared-data", "method": "GET", "path": "/shared/data.js"}
+{"name": "get-favicon", "method": "GET", "path": "/favicon.svg"}
+{"name": "get-missing", "method": "GET", "path": "/nope"}
+{"name": "get-bad-escape", "method": "GET", "path": "/%zz"}
+{"name": "get-climb", "method": "GET", "path": "/shared/../server/db.js"}
+{"name": "get-health", "method": "GET", "path": "/health"}
+{"name": "get-api-unknown", "method": "GET", "path": "/api/nope"}
+{"name": "get-font", "method": "GET", "path": "/fonts/PixelifySans.woff2"}
+{"name": "head-index", "method": "HEAD", "path": "/"}
+{"name": "post-static", "method": "POST", "path": "/style.css"}
+{"name": "cors-preflight", "method": "OPTIONS", "path": "/api/login", "headers": {"Origin": "https://jmoravec01.github.io", "Access-Control-Request-Method": "POST"}}
+{"name": "cors-health", "method": "GET", "path": "/health", "headers": {"Origin": "https://jmoravec01.github.io"}}
+{"name": "cors-evil", "method": "GET", "path": "/health", "headers": {"Origin": "https://evil.example"}}
+{"name": "me-anon", "method": "GET", "path": "/api/me"}
+{"name": "me", "method": "GET", "path": "/api/me", "headers": {"Authorization": "Bearer recording-token-0001"}}
+{"name": "me-badtoken", "method": "GET", "path": "/api/me", "headers": {"Authorization": "Bearer nope"}}
+{"name": "login-bad", "method": "POST", "path": "/api/login", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"Seeded\", \"pass\": \"wrong\"}"}
+{"name": "login-unknown", "method": "POST", "path": "/api/login", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"nobody\", \"pass\": \"secret1\"}"}
+{"name": "login-ok", "method": "POST", "path": "/api/login", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"seeded\", \"pass\": \"secret1\"}"}
+{"name": "login-types", "method": "POST", "path": "/api/login", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": 5, \"pass\": [1]}"}
+{"name": "login-badjson", "method": "POST", "path": "/api/login", "headers": {"Content-Type": "application/json"}, "body": "{nope"}
+{"name": "register-ok", "method": "POST", "path": "/api/register", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"Novy Hrac\", \"pass\": \"secret1\"}"}
+{"name": "register-lookalike", "method": "POST", "path": "/api/register", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"S3eded\", \"pass\": \"secret1\"}"}
+{"name": "register-short-name", "method": "POST", "path": "/api/register", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"x\", \"pass\": \"secret1\"}"}
+{"name": "register-short-pass", "method": "POST", "path": "/api/register", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"Okay\", \"pass\": \"123\"}"}
+{"name": "register-html", "method": "POST", "path": "/api/register", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"<b>x</b>\", \"pass\": \"secret1\"}"}
+{"name": "register-unicode", "method": "POST", "path": "/api/register", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"\\u010cen\\u011bk \\u017dlu\\u0165ou\\u010dk\\u00fd\", \"pass\": \"heslo123\"}"}
+{"name": "logout", "method": "POST", "path": "/api/logout", "headers": {"Authorization": "Bearer recording-token-0001"}}
+{"name": "chars-ok", "method": "POST", "path": "/api/chars", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"name\": \"Gama\", \"cls\": \"vedma\"}"}
+{"name": "chars-badclass", "method": "POST", "path": "/api/chars", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"name\": \"Gama\", \"cls\": \"__proto__\"}"}
+{"name": "chars-badname", "method": "POST", "path": "/api/chars", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"name\": \"g\", \"cls\": \"vedma\"}"}
+{"name": "chars-anon", "method": "POST", "path": "/api/chars", "headers": {"Content-Type": "application/json"}, "body": "{\"name\": \"Gama\", \"cls\": \"vedma\"}"}
+{"name": "chars-delete-1", "method": "POST", "path": "/api/chars/delete", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"id\": 1}"}
+{"name": "chars-delete-float", "method": "POST", "path": "/api/chars/delete", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"id\": 1.5}"}
+{"name": "chars-delete-str", "method": "POST", "path": "/api/chars/delete", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"id\": \"1\"}"}
+{"name": "upgrade-ok", "method": "POST", "path": "/api/upgrade", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 1, \"slot\": \"weapon\"}"}
+{"name": "upgrade-bad-slot", "method": "POST", "path": "/api/upgrade", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 1, \"slot\": \"hat\"}"}
+{"name": "upgrade-bad-char", "method": "POST", "path": "/api/upgrade", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 999, \"slot\": \"ring\"}"}
+{"name": "upgrade-str-char", "method": "POST", "path": "/api/upgrade", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": \"1\", \"slot\": \"ring\"}"}
+{"name": "run-start-ok", "method": "POST", "path": "/api/run/start", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 1, \"dungeon\": \"s1\"}"}
+{"name": "run-start-locked", "method": "POST", "path": "/api/run/start", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 1, \"dungeon\": \"s2\"}"}
+{"name": "run-start-multi", "method": "POST", "path": "/api/run/start", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 1, \"dungeon\": \"m1\"}"}
+{"name": "run-start-badchar", "method": "POST", "path": "/api/run/start", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"charId\": 77, \"dungeon\": \"s1\"}"}
+{"name": "run-finish-bad", "method": "POST", "path": "/api/run/finish", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"ticket\": \"a.b.c\", \"kills\": 1, \"coins\": 0, \"time\": 1, \"cleared\": false}"}
+{"name": "run-finish-garbage", "method": "POST", "path": "/api/run/finish", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{\"ticket\": \"1.1.s1.1.x.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"kills\": 1, \"coins\": 0, \"time\": 1, \"cleared\": false}"}
+{"name": "run-finish-noticket", "method": "POST", "path": "/api/run/finish", "headers": {"Authorization": "Bearer recording-token-0001", "Content-Type": "application/json"}, "body": "{}"}

@@ -1,0 +1,14 @@
+[request]
+method = "POST"
+path = "/api/run/start"
+body = '{"charId": 1, "dungeon": "s2"}'
+
+[request.headers]
+Authorization = "Bearer recording-token-0001"
+Content-Type = "application/json"
+
+[response]
+status = 401
+
+[response.headers]
+content-type = "application/json"

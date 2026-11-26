@@ -1,0 +1,73 @@
+{
+  "schema": "rust-anything/app-cases@1",
+  "name": "data",
+  "run": [
+    "env",
+    "DATA_DIR=.rec/data",
+    "REG_PER_HOUR=100000",
+    "CORS_ORIGINS=https://jmoravec01.github.io",
+    "node",
+    "server/server.js"
+  ],
+  "normalize": [
+    "timestamps",
+    "uuids"
+  ],
+  "timeout_secs": 30,
+  "http": {
+    "fresh": [
+      ".rec/data"
+    ]
+  },
+  "recorded": [
+    "chars-anon",
+    "chars-badclass",
+    "chars-badname",
+    "chars-delete-1",
+    "chars-delete-float",
+    "chars-delete-str",
+    "chars-ok",
+    "cors-evil",
+    "cors-health",
+    "cors-preflight",
+    "get-api-unknown",
+    "get-bad-escape",
+    "get-climb",
+    "get-css",
+    "get-favicon",
+    "get-font",
+    "get-health",
+    "get-index",
+    "get-main-js",
+    "get-missing",
+    "get-shared-data",
+    "head-index",
+    "login-bad",
+    "login-badjson",
+    "login-ok",
+    "login-types",
+    "login-unknown",
+    "logout",
+    "me",
+    "me-anon",
+    "me-badtoken",
+    "post-static",
+    "register-html",
+    "register-lookalike",
+    "register-ok",
+    "register-short-name",
+    "register-short-pass",
+    "register-unicode",
+    "run-finish-bad",
+    "run-finish-garbage",
+    "run-finish-noticket",
+    "run-start-badchar",
+    "run-start-locked",
+    "run-start-multi",
+    "run-start-ok",
+    "upgrade-bad-char",
+    "upgrade-bad-slot",
+    "upgrade-ok",
+    "upgrade-str-char"
+  ]
+}

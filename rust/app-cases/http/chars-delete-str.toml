@@ -1,0 +1,14 @@
+[request]
+method = "POST"
+path = "/api/chars/delete"
+body = '{"id": "1"}'
+
+[request.headers]
+Authorization = "Bearer recording-token-0001"
+Content-Type = "application/json"
+
+[response]
+status = 400
+
+[response.headers]
+content-type = "application/json"

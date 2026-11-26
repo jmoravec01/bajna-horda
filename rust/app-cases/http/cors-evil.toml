@@ -1,0 +1,12 @@
+[request]
+method = "GET"
+path = "/health"
+
+[request.headers]
+Origin = "https://evil.example"
+
+[response]
+status = 200
+
+[response.headers]
+content-type = "application/json"

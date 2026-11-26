@@ -1,0 +1,9 @@
+.git
+.rec
+node_modules
+server-rs/target
+rust
+docs
+test
+data
+_site

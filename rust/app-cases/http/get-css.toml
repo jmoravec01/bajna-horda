@@ -1,0 +1,11 @@
+[request]
+method = "GET"
+path = "/style.css"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-cache"
+content-type = "text/css; charset=utf-8"
+x-content-type-options = "nosniff"

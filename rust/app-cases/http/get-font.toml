@@ -1,0 +1,12 @@
+[request]
+method = "GET"
+path = "/fonts/PixelifySans.woff2"
+
+[response]
+status = 200
+binary = true
+
+[response.headers]
+cache-control = "no-cache"
+content-type = "font/woff2"
+x-content-type-options = "nosniff"

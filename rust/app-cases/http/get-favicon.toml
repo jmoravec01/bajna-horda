@@ -1,0 +1,11 @@
+[request]
+method = "GET"
+path = "/favicon.svg"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-cache"
+content-type = "image/svg+xml"
+x-content-type-options = "nosniff"

@@ -16,4 +16,7 @@ jobs:
           node-version: 24
       - run: for f in server/*.js shared/*.js public/js/*.js tools/*.js; do node --check "$f"; done
       - run: node --test test/*.test.js
+      - run: cd server-rs && cargo test --release --locked && cargo build --release --locked
+      - name: The same server tests against the Rust server
+        run: SERVER=rust node --test test/server.test.js
       - run: docker build -t bajna-horda:ci .

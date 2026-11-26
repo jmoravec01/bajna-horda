@@ -10,7 +10,9 @@ const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = `http://127.0.0.1:
 let proc, dir;
 before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'horde-'));
-  proc = spawn('node', ['server/server.js'], { env: { ...process.env, PORT, DATA_DIR: dir, HOST: '127.0.0.1', RUN_TIME_RATIO: '0', REG_PER_HOUR: '1000' }, stdio: 'pipe' });
+  // SERVER=rust runs the same tests against the Rust port (cargo build --release in server-rs first)
+  const env = { ...process.env, PORT, DATA_DIR: dir, HOST: '127.0.0.1', RUN_TIME_RATIO: '0', REG_PER_HOUR: '1000', APP_ROOT: process.cwd() };
+  proc = process.env.SERVER === 'rust' ? spawn('server-rs/target/release/horde-server', [], { env, stdio: 'pipe' }) : spawn('node', ['server/server.js'], { env, stdio: 'pipe' });
   for (let i = 0; i < 50; i++) { try { if ((await fetch(BASE + '/health')).ok) return; } catch { /* not up yet */ } await new Promise((r) => setTimeout(r, 100)); }
   throw new Error('server did not start');
 });

@@ -15,8 +15,23 @@ Spec: [docs/SPEC.md](docs/SPEC.md) (Czech).
 node server/server.js           # http://localhost:8080 (Node 24+, no npm dependencies)
 node --test test/*.test.js      # tests
 node tools/balance.js           # bots play every dungeon, prints clear rates
-docker compose up --build       # the same in a container, port 8078
+docker compose up --build       # the production image (the Rust server), port 8078
 ```
+
+### Two servers
+
+`server-rs/` is a Rust port of the whole server (HTTP API, WebSocket rooms and the simulation), built with [rust-anything](https://github.com/erkamyaman/rust-anything). It is what the Docker image runs. `server/` (Node, no dependencies) is the reference it is checked against:
+
+```sh
+cd server-rs && cargo test --release           # unit tests of the Rust simulation (also bit-exact RNG check against JS)
+cargo build --release && cd ..
+SERVER=rust node --test test/server.test.js     # the API + co-op tests, run against the Rust binary
+node tools/seed-fixture.mjs .rec/data           # known database for the recorded HTTP cases
+rust-anything app replay . --build "env DATA_DIR=.rec/data REG_PER_HOUR=100000 CORS_ORIGINS=https://jmoravec01.github.io APP_ROOT=$PWD $PWD/server-rs/target/release/horde-server"
+node tools/gen-data.mjs                         # regenerate server-rs/data.json after editing shared/data.js
+```
+
+The recorded cases (49 HTTP requests: static files, CORS, accounts, characters, runs) live in `rust/app-cases/`. Both servers share the database format, so they can be switched without migrating.
 
 Environment: `PORT`, `DATA_DIR` (SQLite database), `TRUST_PROXY=1` behind a reverse proxy, `CORS_ORIGINS` (pages allowed to use the API, e.g. `https://you.github.io`).
 
