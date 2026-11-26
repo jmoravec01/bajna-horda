@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sim } from '../shared/sim.js';
-import { CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT } from '../shared/data.js';
-import { newChar, power, charStats, applyRun, upgradeEquip, createChar, newProfile, xpNeed, runReward, validName, unlocked } from '../shared/meta.js';
+import { CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, ARMS, ARM, ARM_TIERS, MAX_PLUS, STARTER } from '../shared/data.js';
+import { newChar, power, charStats, applyRun, upgradeEquip, armError, armOf, armDmg, armUpCost, fixArms, createChar, newProfile, xpNeed, runReward, validName, unlocked } from '../shared/meta.js';
 import { runBot } from '../tools/bot.js';
 
 const ch = (cls, level = 1) => ({ ...newChar(1, 't', cls), level });
@@ -96,9 +96,31 @@ test('meta: rewards, levels, unlocks, equipment, character limits', () => {
   assert.equal(p.progress.single, 2); assert.ok(unlocked(p, DUNGEONS.single[1])); assert.ok(!unlocked(p, DUNGEONS.single[2]));
   const failed = runReward({ timeSec: 100, kills: 50, coinsPicked: 10, cleared: false, dungeonId: 's1' }), won = runReward({ timeSec: 100, kills: 50, coinsPicked: 10, cleared: true, dungeonId: 's1' });
   assert.ok(failed.xp < won.xp);
-  p.coins = 10; assert.equal(upgradeEquip(p, c.id, 'weapon'), 'poor');
-  p.coins = 1000; assert.equal(upgradeEquip(p, c.id, 'weapon'), null); assert.equal(c.equip.weapon, 2);
+  p.coins = 10; assert.equal(upgradeEquip(p, c.id, 'armor'), 'poor');
+  p.coins = 1000; assert.equal(upgradeEquip(p, c.id, 'armor'), null); assert.equal(c.equip.armor, 2);
+  assert.equal(upgradeEquip(p, c.id, 'weapon'), 'bad');
   assert.equal(upgradeEquip(p, c.id, 'bogus'), 'bad');
   assert.ok(validName('Hráč 1') && !validName('x') && !validName('<b>'));
   assert.ok(xpNeed(50) > xpNeed(10));
+});
+
+test('armory: 48 weapons, unique ids, buy / equip / upgrade to +9, stronger weapon = stronger hero', () => {
+  assert.equal(ARMS.length, 48); assert.equal(new Set(ARMS.map((w) => w.id)).size, 48);
+  assert.ok(ARM[STARTER] && ARM[STARTER].tier === 1);
+  const p = newProfile(); createChar(p, 'Kuba', 'perun', 1); const c = p.chars[0];
+  assert.deepEqual([c.held, c.arms], [STARTER, { [STARTER]: 0 }]);
+  p.coins = 1e6; c.level = 50;
+  assert.equal(armError(p, 1, 'buy', 'sword4'), null); assert.equal(armError(p, 1, 'buy', 'sword4'), 'owned');
+  const before = charStats(c).dmg, pw = power(c);
+  assert.equal(armError(p, 1, 'equip', 'sword4'), null); assert.equal(c.held, 'sword4');
+  assert.ok(charStats(c).dmg > before * 1.7 && power(c) > pw);
+  for (let i = 0; i < MAX_PLUS; i++) assert.equal(armError(p, 1, 'up', 'sword4'), null);
+  assert.equal(armError(p, 1, 'up', 'sword4'), 'max'); assert.equal(c.arms.sword4, MAX_PLUS);
+  const [w, plus] = armOf(c); assert.ok(Math.abs(armDmg(w, plus) - w.dmg * 1.45) < 1e-9);
+  assert.ok(armUpCost(w, 8) > armUpCost(w, 0));
+  c.level = 1; assert.equal(armError(p, 1, 'buy', 'axe2'), 'level');
+  p.coins = 0; c.level = 50; assert.equal(armError(p, 1, 'buy', 'axe2'), 'poor');
+  const old = { equip: { weapon: 5, armor: 2, ring: 1, boots: 1 }, level: 1 }; fixArms(old);   // legacy numeric weapon level
+  assert.deepEqual([old.held, old.arms, 'weapon' in old.equip], [STARTER, { [STARTER]: 4 }, false]);
+  assert.ok(ARM_TIERS.every((t, i) => !i || t.dmg > ARM_TIERS[i - 1].dmg));
 });

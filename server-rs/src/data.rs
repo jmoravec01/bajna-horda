@@ -16,6 +16,18 @@ pub struct Consts {
     pub max_passives: usize,
     pub max_item_lvl: u32,
     pub max_equip: u32,
+    pub max_plus: u32,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Arm {
+    pub id: String,
+    pub tier: u32,
+    pub dmg: f64,
+    pub perk: Option<String>,
+    pub perk_val: f64,
+    pub need: u32,
+    pub price: i64,
 }
 
 // Class traits: a missing trait is 0, which behaves like the JS `cl.x || default`.
@@ -110,6 +122,8 @@ pub struct Data {
     pub arch: HashMap<String, Arch>,
     pub dungeons: Vec<Dungeon>,
     pub slots: Vec<String>,
+    pub starter: String,
+    pub arms: Vec<Arm>,
 }
 
 pub fn data() -> &'static Data {
@@ -119,6 +133,9 @@ pub fn data() -> &'static Data {
 
 pub fn class(id: &str) -> Option<&'static Class> {
     data().classes.iter().find(|c| c.id == id)
+}
+pub fn arm(id: &str) -> Option<&'static Arm> {
+    data().arms.iter().find(|a| a.id == id)
 }
 pub fn dungeon(id: &str) -> Option<&'static Dungeon> {
     data().dungeons.iter().find(|d| d.id == id)

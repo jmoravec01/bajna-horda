@@ -100,7 +100,7 @@ pub enum Ev {
 pub struct OverPlayer { pub kills: u32, pub coins: f64, pub reward: f64 }
 pub struct Over { pub cleared: bool, pub time: f64, pub players: Vec<OverPlayer> }
 
-pub struct SimPlayerIn { pub name: String, pub cls: String, pub level: u32, pub equip: crate::meta::Equip }
+pub struct SimPlayerIn { pub name: String, pub cls: String, pub level: u32, pub equip: crate::meta::Equip, pub arms: std::collections::BTreeMap<String, u32>, pub held: String }
 
 pub struct Sim {
     rnd: Rng,
@@ -149,7 +149,7 @@ impl Sim {
 
     fn make_player(&mut self, id: u32, c: SimPlayerIn) -> Player {
         let cl = class(&c.cls).expect("class");
-        let ch = Char { id: 0, name: c.name.clone(), cls: c.cls.clone(), level: c.level, xp: 0, equip: c.equip };
+        let ch = Char { id: 0, name: c.name.clone(), cls: c.cls.clone(), level: c.level, xp: 0, equip: c.equip, arms: c.arms, held: c.held };
         let mut p = Player { id, name: c.name, cls: c.cls, cl, st: char_stats(&ch), power: power(&ch), x: 0.0, y: 0.0, dx: 0.0, dy: 0.0, face: 1, hp: 0.0, max_hp: 0.0, spd: 0.0,
             inv: 0.0, dead: false, rev: 0.0, level: 1, xp: 0.0, kills: 0, coins: 0.0, weapons: vec![], passives: vec![], pending: vec![], blink_cd: 0.0, freeze_cd: 6.0, gone: false, reward: 1.0, dmg_done: 0.0 };
         p.weapons.push(PWeapon { wix: weapon_idx(&cl.weapon), lvl: 1, cd: 0.4, ang: 0.0 });
@@ -930,8 +930,9 @@ mod tests {
     fn input(cls: &str, level: u32) -> SimPlayerIn {
         let mut e = Equip::new();
         let k = (1 + level / 6).min(20);
-        e.weapon = k; e.armor = k; e.ring = k; e.boots = k;
-        SimPlayerIn { name: "bot".into(), cls: cls.into(), level, equip: if level > 1 { e } else { Equip::new() } }
+        e.armor = k; e.ring = k; e.boots = k;
+        let held = if level > 1 { format!("sword{}", (1 + level / 20).min(4)) } else { "staff1".to_string() };
+        SimPlayerIn { name: "bot".into(), cls: cls.into(), level, equip: if level > 1 { e } else { Equip::new() }, arms: std::collections::BTreeMap::from([(held.clone(), (k - 1).min(9))]), held }
     }
 
     // Port of tools/bot.js: flees from enemies, collects gems, always takes the first upgrade.

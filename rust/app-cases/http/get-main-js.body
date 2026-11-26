@@ -1,10 +1,11 @@
 // Screens and navigation.
-import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS } from '../shared/data.js';
-import { charStats, power, xpNeed, upgradeCost, unlocked, validName } from '../shared/meta.js';
+import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS, ARMS, ARM, ARM_TYPES, MAX_PLUS } from '../shared/data.js';
+import { charStats, power, xpNeed, upgradeCost, unlocked, validName, armOf, armDmg, armUpCost } from '../shared/meta.js';
 import { t, nm, ds, setLang, getLang, detectLang, errText } from './i18n.js';
 import { store, profile, Net, OFFLINE } from './net.js';
 import { Run } from './game.js';
-import { heroSprite } from './sprites.js';
+import { heroSprite, armSprite, armGlow } from './sprites.js';
+import { drawHeld } from './render.js';
 import { sfx, music, setMuted, isMuted } from './audio.js';
 
 const $app = document.getElementById('app');
@@ -15,12 +16,20 @@ const S = { screen: 'title', run: null, net: null, room: null, pick: 'bohatyr', 
 const activeChar = () => profile.p?.chars.find((c) => c.id === store.d.active) || profile.p?.chars[0] || null;
 // a world is found by three hero faces; the wire code is 3 letters, A..L = the class index
 const faces = (code, scale = 4) => [...code].map((ch) => heroCv(CLASSES[ch.charCodeAt(0) - 65].id, scale)).join('');
-const heroCv = (cls, scale = 3) => `<canvas class="hero" data-hero="${cls}" data-s="${scale}"></canvas>`;
+const heroCv = (cls, scale = 3, arm) => `<canvas class="hero" data-hero="${cls}" data-s="${scale}"${arm ? ` data-arm="${arm[0].id}" data-plus="${arm[1]}"` : ''}></canvas>`;
+const armCv = (id, plus, scale = 4) => `<canvas class="armcv" data-armid="${id}" data-plus="${plus}" data-s="${scale}"></canvas>`;
 function fillHeroes() {
   for (const c of $app.querySelectorAll('canvas[data-hero]')) {
-    const s = heroSprite(c.dataset.hero, 0), k = +c.dataset.s;
-    c.width = s.width; c.height = s.height; c.style.width = s.width * k + 'px'; c.style.height = s.height * k + 'px';
-    c.getContext('2d').drawImage(s, 0, 0);
+    const s = heroSprite(c.dataset.hero, 0), k = +c.dataset.s, held = c.dataset.arm, pad = held ? 8 : 0, top = held ? 4 : 0;   // room for the weapon in the hand
+    c.width = s.width + pad; c.height = s.height + top; c.style.width = c.width * k + 'px'; c.style.height = c.height * k + 'px';
+    const x = c.getContext('2d'); x.drawImage(s, 0, top);
+    if (held) drawHeld(x, { s: armSprite(held), plus: +c.dataset.plus }, c.dataset.hero === 'golem' ? 13 : 11, top + 12, 0.45, 0);
+  }
+  for (const c of $app.querySelectorAll('canvas[data-armid]')) {      // a weapon icon, centred in a 16x16 box; the frame colour shows the upgrade
+    const s = armSprite(c.dataset.armid), k = +c.dataset.s;
+    c.width = 16; c.height = 16; c.style.width = 16 * k + 'px'; c.style.height = 16 * k + 'px';
+    c.getContext('2d').drawImage(s, 8 - Math.round(s.width / 2), 8 - Math.round(s.height / 2));
+    c.style.setProperty('--glow', armGlow(+c.dataset.plus) || 'transparent');
   }
 }
 function view(html, bind) {
@@ -81,7 +90,9 @@ const SCREENS = {
   chars() {
     S.args = []; const p = profile.p, c = activeChar();
     const list = p.chars.map((x) => `<button class="tile ${c && x.id === c.id ? 'sel' : ''}" data-id="${x.id}">${heroCv(x.cls, 3)}<b>${esc(x.name)}</b><small>${t('level')} ${x.level}</small></button>`).join('');
-    const eq = c ? SLOTS.map((s) => {
+    const aw = c ? armOf(c) : null;
+    const weaponRow = c ? `<div class="eq">${armCv(aw[0].id, aw[1], 3)}<span class="en"><b>${esc(nm(aw[0]))} +${aw[1]}</b><small>${t('weapon')} · ${t('dmg_mul')} ×${armDmg(aw[0], aw[1]).toFixed(2)}</small></span><button class="btn small" data-go="arms">${t('armory')}</button></div>` : '';
+    const eq = c ? weaponRow + SLOTS.map((s) => {
       const lvl = c.equip[s], cost = upgradeCost(lvl);
       return `<div class="eq"><span class="en"><b>${t(s)}</b><small>${t(s + '_d')}</small></span><span class="lvl">${lvl}/${MAX_EQUIP}</span>${lvl >= MAX_EQUIP ? `<span class="maxed">${t('maxed')}</span>` : `<button class="btn small" data-up="${s}" ${p.coins >= cost ? '' : 'disabled'}>${cost} ◆</button>`}</div>`;
     }).join('') : '';
@@ -90,6 +101,25 @@ const SCREENS = {
       const tile = e.target.closest('.tile[data-id]'); if (tile) { store.d.active = +tile.dataset.id; store.save(); sfx('click'); return SCREENS.chars(); }
       const up = e.target.closest('[data-up]'); if (up) { try { await profile.upgrade(c.id, up.dataset.up); sfx('level'); SCREENS.chars(); } catch (er) { note(errText(er)); } return; }
       if (e.target.closest('[data-act=del]') && confirm(t('confirm_del'))) { try { await profile.remove(c.id); store.d.active = null; SCREENS.chars(); } catch (er) { note(errText(er)); } }
+    }));
+  },
+
+  arms() {
+    S.args = []; const p = profile.p, c = activeChar(); if (!c) return go('chars');
+    const sel = ARM[S.armSel] || armOf(c)[0], has = c.arms[sel.id] !== undefined, plus = c.arms[sel.id] ?? 0, held = armOf(c)[0].id === sel.id;
+    const pr = (w, pl) => { const v = w.perkVal * (1 + pl / MAX_PLUS), k = { hp: 1, spd: 0.5, cd: 1, magnet: 3 }[w.perk]; return w.perk ? `+${(v * k * 100).toFixed(1).replace('.0', '')} % ${t('perk_' + w.perk)}` : t('perk_none'); };
+    const cost = armUpCost(sel, plus);
+    const action = !has ? (c.level < sel.need ? `<button class="btn" disabled>${t('need_lvl')} ${sel.need}</button>` : `<button class="btn" data-op="buy" ${p.coins >= sel.price ? '' : 'disabled'}>${t('buy')} · ${sel.price} ◆</button>`)
+      : `${plus >= MAX_PLUS ? `<span class="maxed">${t('maxed')}</span>` : `<button class="btn" data-op="up" ${p.coins >= cost ? '' : 'disabled'}>${t('upgrade')} +${plus + 1} · ${cost} ◆</button>`}${held ? `<span class="maxed">${t('held')}</span>` : `<button class="btn alt" data-op="equip">${t('equip')}</button>`}`;
+    const grid = Object.keys(ARM_TYPES).map((ty) => `<div class="armrow"><span class="ty">${t('type_' + ty)}</span>${ARMS.filter((w) => w.type === ty).map((w) => {
+      const o = c.arms[w.id]; return `<button class="atile ${w.id === sel.id ? 'sel' : ''} ${o === undefined ? 'locked' : ''} t${w.tier}" data-arm="${w.id}">${armCv(w.id, o ?? 0, 3)}<b>${o === undefined ? (c.level < w.need ? '🔒' : '') : '+' + o}</b>${armOf(c)[0].id === w.id ? '<i>✓</i>' : ''}</button>`; }).join('')}</div>`).join('');
+    view(`<div class="screen arms">${topbar('chars')}<h2>${t('armory')}</h2>
+      <div class="card armdetail t${sel.tier}">${armCv(sel.id, plus, 6)}<div class="info"><b>${esc(nm(sel))}${has ? ` +${plus}` : ''}</b><small>${t('type_' + sel.type)} · ${t('t' + sel.tier)}</small>
+        <small>${t('dmg_mul')} ×${armDmg(sel, plus).toFixed(2)}${plus < MAX_PLUS && has ? ` → ×${armDmg(sel, plus + 1).toFixed(2)}` : ''}</small><small>${pr(sel, plus)}</small><small>${t('level')} ${sel.need}+</small></div></div>
+      <div class="acts">${action}</div><p class="msg"></p><div class="armgrid">${grid}</div></div>`, (root) => wire(root, async (e) => {
+      const tile = e.target.closest('[data-arm]'); if (tile) { S.armSel = tile.dataset.arm; sfx('click'); return SCREENS.arms(); }
+      const op = e.target.closest('[data-op]')?.dataset.op; if (!op) return;
+      try { await profile.arm(c.id, op, sel.id); sfx(op === 'up' ? 'level' : 'click'); SCREENS.arms(); } catch (er) { note(errText(er)); }
     }));
   },
 
@@ -181,7 +211,7 @@ const SCREENS = {
 
 function charCard(c, compact) {
   const cl = CLASS[c.cls], st = charStats(c), pw = power(c);
-  return `<div class="card char">${heroCv(c.cls, 4)}<div class="info"><b>${esc(c.name)}</b><small>${esc(nm(cl))} · ${t('level')} ${c.level}</small>${wbar(c.xp, xpNeed(c.level))}
+  return `<div class="card char">${heroCv(c.cls, 4, armOf(c))}<div class="info"><b>${esc(c.name)}</b><small>${esc(nm(cl))} · ${t('level')} ${c.level}</small>${wbar(c.xp, xpNeed(c.level))}
     ${compact ? '' : `<small>${esc(ds(cl))}</small>`}<small>${t('power')} ${pw} · HP ${Math.round(100 * cl.hp * st.hp)} · ${t('weapon')} ${Math.round(cl.dmg * st.dmg * 100)} %</small></div></div>`;
 }
 
@@ -198,7 +228,7 @@ async function startSingle(dunId) {
   const c = activeChar();
   if (!profile.isGuest && !OFFLINE) return startSolo(dunId);
   // guest / offline: the run is simulated here and the result stays in this browser
-  S.run = new Run({ root: $app, mode: 'single', dun: dunId, players: [{ id: 1, name: c.name, cls: c.cls }], meId: 1, char: { ...c }, onEnd: (over, st) => {
+  S.run = new Run({ root: $app, mode: 'single', dun: dunId, players: [{ id: 1, name: c.name, cls: c.cls, arm: armOf(c)[0].id, plus: armOf(c)[1] }], meId: 1, char: { ...c }, onEnd: (over, st) => {
     S.run = null;
     const j = profile.runFinishLocal(c.id, { dungeonId: dunId, kills: st.kills, coinsPicked: st.coinsPicked, timeSec: st.timeSec, cleared: st.cleared });
     go('result', { cleared: st.cleared, time: st.timeSec, kills: st.kills, reward: j.reward, levelUp: j.levelUp, level: activeChar().level });

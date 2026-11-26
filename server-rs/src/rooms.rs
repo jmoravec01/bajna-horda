@@ -207,11 +207,11 @@ impl Hub {
 
     fn start_run(&self, s: &mut State, code: &str) {
         let members: Vec<u64> = s.rooms[code].members.clone();
-        let players: Vec<SimPlayerIn> = members.iter().map(|m| { let c = s.members[m].ch.as_ref().unwrap(); SimPlayerIn { name: c.name.clone(), cls: c.cls.clone(), level: c.level, equip: c.equip.clone() } }).collect();
+        let players: Vec<SimPlayerIn> = members.iter().map(|m| { let c = s.members[m].ch.as_ref().unwrap(); SimPlayerIn { name: c.name.clone(), cls: c.cls.clone(), level: c.level, equip: c.equip.clone(), arms: c.arms.clone(), held: c.held.clone() } }).collect();
         let seed: u32 = rand::random::<u32>() >> 1;
         let dun = s.rooms[code].dun.clone();
         let sim = Sim::new(seed, &dun, players);
-        let list: Vec<Value> = members.iter().enumerate().map(|(i, m)| { let c = s.members[m].ch.as_ref().unwrap(); json!({"id": i + 1, "name": c.name, "cls": c.cls}) }).collect();
+        let list: Vec<Value> = members.iter().enumerate().map(|(i, m)| { let c = s.members[m].ch.as_ref().unwrap(); let (w, plus) = crate::meta::arm_of(c); json!({"id": i + 1, "name": c.name, "cls": c.cls, "arm": w.id, "plus": plus}) }).collect();
         for (i, m) in members.iter().enumerate() {
             let mm = s.members.get_mut(m).unwrap(); mm.pid = i as u32 + 1; mm.left = false;
             send(mm, json!({"t": "start", "dun": dun, "you": i + 1, "players": list}));

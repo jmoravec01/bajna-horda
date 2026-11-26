@@ -1,5 +1,5 @@
 // SQLite storage: accounts, sessions, characters. Same schema and password/ticket formats as server/db.js, so both servers can share one database file.
-use crate::meta::{new_profile, Char, Equip, Profile};
+use crate::meta::{fix_arms, new_profile, Char, Equip, Profile};
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
 
@@ -87,6 +87,11 @@ impl Db {
           CREATE TABLE IF NOT EXISTS used_tickets (nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL);
           CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
         ")?;
+        // armory columns (added after the first release); old rows are converted lazily by fix_arms
+        for col in ["arms", "held"] {
+            let have: bool = c.prepare("PRAGMA table_info(chars)")?.query_map([], |r| r.get::<_, String>(1))?.flatten().any(|n| n == col);
+            if !have { c.execute_batch(&format!("ALTER TABLE chars ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"))?; }
+        }
         Ok(Db(Mutex::new(c)))
     }
     fn c(&self) -> std::sync::MutexGuard<'_, Connection> { self.0.lock().unwrap_or_else(|e| e.into_inner()) }
@@ -127,7 +132,7 @@ impl Db {
         let (coins, ps, pm): (i64, i64, i64) = c.query_row("SELECT coins, prog_single, prog_multi FROM users WHERE id = ?", [user_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional().ok().flatten()?;
         let mut p = new_profile();
         p.coins = coins; p.single = ps as usize; p.multi = pm as usize;
-        let mut st = c.prepare("SELECT id, name, cls, level, xp, e_weapon, e_armor, e_ring, e_boots FROM chars WHERE user_id = ? ORDER BY id").ok()?;
+        let mut st = c.prepare("SELECT id, name, cls, level, xp, e_weapon, e_armor, e_ring, e_boots, arms, held FROM chars WHERE user_id = ? ORDER BY id").ok()?;
         let rows = st.query_map([user_id], |r| Ok(row_char(r))).ok()?;
         for r in rows.flatten() { p.chars.push(r); }
         Some(p)
@@ -137,12 +142,12 @@ impl Db {
         let tx = c.transaction()?;
         tx.execute("UPDATE users SET coins = ?, prog_single = ?, prog_multi = ? WHERE id = ?", params![p.coins, p.single as i64, p.multi as i64, user_id])?;
         for ch in &p.chars {
-            tx.execute("UPDATE chars SET level = ?, xp = ?, e_weapon = ?, e_armor = ?, e_ring = ?, e_boots = ? WHERE id = ?", params![ch.level, ch.xp, ch.equip.weapon, ch.equip.armor, ch.equip.ring, ch.equip.boots, ch.id])?;
+            tx.execute("UPDATE chars SET level = ?, xp = ?, e_armor = ?, e_ring = ?, e_boots = ?, arms = ?, held = ? WHERE id = ?", params![ch.level, ch.xp, ch.equip.armor, ch.equip.ring, ch.equip.boots, serde_json::to_string(&ch.arms).unwrap_or_default(), ch.held, ch.id])?;
         }
         tx.commit()
     }
     pub fn get_char(&self, id: i64, user_id: i64) -> Option<Char> {
-        self.c().query_row("SELECT id, name, cls, level, xp, e_weapon, e_armor, e_ring, e_boots FROM chars WHERE id = ? AND user_id = ?", params![id, user_id], |r| Ok(row_char(r))).optional().ok().flatten()
+        self.c().query_row("SELECT id, name, cls, level, xp, e_weapon, e_armor, e_ring, e_boots, arms, held FROM chars WHERE id = ? AND user_id = ?", params![id, user_id], |r| Ok(row_char(r))).optional().ok().flatten()
     }
     pub fn insert_char(&self, user_id: i64, name: &str, cls: &str) { let _ = self.c().execute("INSERT INTO chars (user_id, name, cls, created) VALUES (?, ?, ?, ?)", params![user_id, name, cls, now_ms()]); }
     pub fn delete_char(&self, id: i64, user_id: i64) { let _ = self.c().execute("DELETE FROM chars WHERE id = ? AND user_id = ?", params![id, user_id]); }
@@ -155,6 +160,9 @@ impl Db {
 }
 
 fn row_char(r: &rusqlite::Row) -> Char {
-    Char { id: r.get(0).unwrap_or(0), name: r.get(1).unwrap_or_default(), cls: r.get(2).unwrap_or_default(), level: r.get(3).unwrap_or(1), xp: r.get(4).unwrap_or(0),
-        equip: Equip { weapon: r.get(5).unwrap_or(1), armor: r.get(6).unwrap_or(1), ring: r.get(7).unwrap_or(1), boots: r.get(8).unwrap_or(1) } }
+    let mut c = Char { id: r.get(0).unwrap_or(0), name: r.get(1).unwrap_or_default(), cls: r.get(2).unwrap_or_default(), level: r.get(3).unwrap_or(1), xp: r.get(4).unwrap_or(0),
+        equip: Equip { armor: r.get(6).unwrap_or(1), ring: r.get(7).unwrap_or(1), boots: r.get(8).unwrap_or(1) }, arms: Default::default(), held: r.get::<_, String>(10).unwrap_or_default() };
+    let arms: Option<std::collections::BTreeMap<String, u32>> = serde_json::from_str(&r.get::<_, String>(9).unwrap_or_default()).ok();
+    fix_arms(&mut c, arms, r.get(5).unwrap_or(1));
+    c
 }

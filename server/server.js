@@ -6,7 +6,7 @@ import { join, normalize, extname, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { CLASS } from '../shared/data.js';
-import { validName, createChar, upgradeEquip } from '../shared/meta.js';
+import { validName, createChar, upgradeEquip, armError } from '../shared/meta.js';
 import { db, q, sha256, hashPassword, checkPassword, createUser, newSession, loadProfile, saveProfile, getChar, nameKey } from './db.js';
 import { upgrade } from './ws.js';
 import { connect, stats } from './rooms.js';
@@ -91,6 +91,12 @@ const API = {
   async 'POST upgrade'(req) {
     const u = need(req); const { charId, slot } = await readJson(req);
     const p = loadProfile(u.id), err = upgradeEquip(p, charId, slot);
+    if (err) throw new HttpError(400, err);
+    saveProfile(u.id, p); return { profile: p };
+  },
+  async 'POST arm'(req) {                       // buy | up | equip a held weapon
+    const u = need(req); const { charId, op, id } = await readJson(req);
+    const p = loadProfile(u.id), err = armError(p, charId, op, id);
     if (err) throw new HttpError(400, err);
     saveProfile(u.id, p); return { profile: p };
   },

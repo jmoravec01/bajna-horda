@@ -9,7 +9,8 @@
   "MAX_WEAPONS": 5,
   "MAX_PASSIVES": 5,
   "MAX_ITEM_LVL": 8,
-  "MAX_EQUIP": 20
+  "MAX_EQUIP": 20,
+  "MAX_PLUS": 9
  },
  "classes": [
   {
@@ -594,9 +595,443 @@
   }
  ],
  "slots": [
-  "weapon",
   "armor",
   "ring",
   "boots"
+ ],
+ "starter": "staff1",
+ "arms": [
+  {
+   "id": "sword1",
+   "tier": 1,
+   "dmg": 1.04,
+   "perk": "hp",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "sword2",
+   "tier": 2,
+   "dmg": 1.248,
+   "perk": "hp",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "sword3",
+   "tier": 3,
+   "dmg": 1.508,
+   "perk": "hp",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "sword4",
+   "tier": 4,
+   "dmg": 1.82,
+   "perk": "hp",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "dagger1",
+   "tier": 1,
+   "dmg": 1,
+   "perk": "spd",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "dagger2",
+   "tier": 2,
+   "dmg": 1.2,
+   "perk": "spd",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "dagger3",
+   "tier": 3,
+   "dmg": 1.45,
+   "perk": "spd",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "dagger4",
+   "tier": 4,
+   "dmg": 1.75,
+   "perk": "spd",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "axe1",
+   "tier": 1,
+   "dmg": 1.1,
+   "perk": null,
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "axe2",
+   "tier": 2,
+   "dmg": 1.32,
+   "perk": null,
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "axe3",
+   "tier": 3,
+   "dmg": 1.595,
+   "perk": null,
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "axe4",
+   "tier": 4,
+   "dmg": 1.9250000000000003,
+   "perk": null,
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "hammer1",
+   "tier": 1,
+   "dmg": 1.1,
+   "perk": "hp",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "hammer2",
+   "tier": 2,
+   "dmg": 1.32,
+   "perk": "hp",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "hammer3",
+   "tier": 3,
+   "dmg": 1.595,
+   "perk": "hp",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "hammer4",
+   "tier": 4,
+   "dmg": 1.9250000000000003,
+   "perk": "hp",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "mace1",
+   "tier": 1,
+   "dmg": 1.06,
+   "perk": "magnet",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "mace2",
+   "tier": 2,
+   "dmg": 1.272,
+   "perk": "magnet",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "mace3",
+   "tier": 3,
+   "dmg": 1.537,
+   "perk": "magnet",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "mace4",
+   "tier": 4,
+   "dmg": 1.855,
+   "perk": "magnet",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "spear1",
+   "tier": 1,
+   "dmg": 1.02,
+   "perk": "magnet",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "spear2",
+   "tier": 2,
+   "dmg": 1.224,
+   "perk": "magnet",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "spear3",
+   "tier": 3,
+   "dmg": 1.4789999999999999,
+   "perk": "magnet",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "spear4",
+   "tier": 4,
+   "dmg": 1.7850000000000001,
+   "perk": "magnet",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "staff1",
+   "tier": 1,
+   "dmg": 1,
+   "perk": "cd",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "staff2",
+   "tier": 2,
+   "dmg": 1.2,
+   "perk": "cd",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "staff3",
+   "tier": 3,
+   "dmg": 1.45,
+   "perk": "cd",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "staff4",
+   "tier": 4,
+   "dmg": 1.75,
+   "perk": "cd",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "wand1",
+   "tier": 1,
+   "dmg": 1,
+   "perk": "cd",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "wand2",
+   "tier": 2,
+   "dmg": 1.2,
+   "perk": "cd",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "wand3",
+   "tier": 3,
+   "dmg": 1.45,
+   "perk": "cd",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "wand4",
+   "tier": 4,
+   "dmg": 1.75,
+   "perk": "cd",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "scythe1",
+   "tier": 1,
+   "dmg": 1.08,
+   "perk": "magnet",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "scythe2",
+   "tier": 2,
+   "dmg": 1.296,
+   "perk": "magnet",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "scythe3",
+   "tier": 3,
+   "dmg": 1.566,
+   "perk": "magnet",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "scythe4",
+   "tier": 4,
+   "dmg": 1.8900000000000001,
+   "perk": "magnet",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "club1",
+   "tier": 1,
+   "dmg": 1.06,
+   "perk": "hp",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "club2",
+   "tier": 2,
+   "dmg": 1.272,
+   "perk": "hp",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "club3",
+   "tier": 3,
+   "dmg": 1.537,
+   "perk": "hp",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "club4",
+   "tier": 4,
+   "dmg": 1.855,
+   "perk": "hp",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "bow1",
+   "tier": 1,
+   "dmg": 1.02,
+   "perk": "spd",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "bow2",
+   "tier": 2,
+   "dmg": 1.224,
+   "perk": "spd",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "bow3",
+   "tier": 3,
+   "dmg": 1.4789999999999999,
+   "perk": "spd",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "bow4",
+   "tier": 4,
+   "dmg": 1.7850000000000001,
+   "perk": "spd",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  },
+  {
+   "id": "flail1",
+   "tier": 1,
+   "dmg": 1.04,
+   "perk": "spd",
+   "perk_val": 0.02,
+   "need": 1,
+   "price": 120
+  },
+  {
+   "id": "flail2",
+   "tier": 2,
+   "dmg": 1.248,
+   "perk": "spd",
+   "perk_val": 0.035,
+   "need": 8,
+   "price": 600
+  },
+  {
+   "id": "flail3",
+   "tier": 3,
+   "dmg": 1.508,
+   "perk": "spd",
+   "perk_val": 0.05,
+   "need": 20,
+   "price": 2200
+  },
+  {
+   "id": "flail4",
+   "tier": 4,
+   "dmg": 1.82,
+   "perk": "spd",
+   "perk_val": 0.07,
+   "need": 40,
+   "price": 6000
+  }
  ]
 }

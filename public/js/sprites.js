@@ -1,5 +1,5 @@
 // Procedural pixel art: heroes, enemies, items, ground and a tiny 3x5 text font. All sprites are drawn once into small canvases.
-import { CLASS, DUNGEON, ARCH } from '../shared/data.js';
+import { CLASS, DUNGEON, ARCH, ARM_TYPES } from '../shared/data.js';
 
 const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 const OUT = [17, 17, 17];
@@ -69,18 +69,18 @@ export function enemyFor(d, type) {
 // ---------- heroes (12x16) ----------
 const SKIN = '#f2c38f';
 const HERO = {
-  krakonos: { hat: [[4, 0, 4, 1, '#5a3a1a'], [3, 1, 6, 2, '#5a3a1a']], extra: [[3, 6, 6, 3, '#dfe8d0'], [10, 3, 1, 12, '#8a5a2a'], [9, 2, 3, 1, '#4a9a3a']] },
-  zbojnik: { hat: [[3, 1, 6, 2, '#222'], [2, 2, 8, 1, '#222'], [8, 0, 1, 2, '#e33']], extra: [[3, 10, 6, 1, '#c9a14a'], [10, 6, 1, 6, '#8a5a2a'], [9, 5, 3, 2, '#bbb']] },
-  perun: { hat: [[3, 1, 6, 2, '#f0d040'], [2, 2, 1, 4, '#f0d040'], [9, 2, 1, 4, '#f0d040']], extra: [[10, 5, 1, 2, '#ff0'], [9, 7, 2, 1, '#ff0'], [10, 8, 1, 2, '#ff0']] },
-  cert: { skin: '#c0392b', hat: [[3, 0, 1, 2, '#222'], [8, 0, 1, 2, '#222'], [3, 2, 6, 1, '#3a1010']], extra: [[10, 4, 1, 10, '#888'], [9, 3, 3, 1, '#888'], [10, 12, 2, 1, '#c0392b'], [11, 11, 1, 1, '#c0392b']] },
+  krakonos: { hat: [[4, 0, 4, 1, '#5a3a1a'], [3, 1, 6, 2, '#5a3a1a']], extra: [[3, 6, 6, 3, '#dfe8d0']] },
+  zbojnik: { hat: [[3, 1, 6, 2, '#222'], [2, 2, 8, 1, '#222'], [8, 0, 1, 2, '#e33']], extra: [[3, 10, 6, 1, '#c9a14a']] },
+  perun: { hat: [[3, 1, 6, 2, '#f0d040'], [2, 2, 1, 4, '#f0d040'], [9, 2, 1, 4, '#f0d040']], extra: [[3, 11, 6, 1, '#ff0']] },
+  cert: { skin: '#c0392b', hat: [[3, 0, 1, 2, '#222'], [8, 0, 1, 2, '#222'], [3, 2, 6, 1, '#3a1010']], extra: [[10, 12, 2, 1, '#c0392b'], [11, 11, 1, 1, '#c0392b']] },
   bohatyr: { hat: [[3, 1, 6, 2, '#bbb'], [5, 0, 2, 1, '#bbb'], [3, 3, 1, 2, '#bbb'], [8, 3, 1, 2, '#bbb']], extra: [[0, 7, 3, 5, '#8a5a2a'], [1, 8, 1, 3, '#d4a017'], [5, 6, 2, 1, '#7a4a1a']] },
-  vedma: { hat: [[3, 1, 6, 3, '#7d3c98'], [2, 3, 1, 5, '#7d3c98'], [9, 3, 1, 5, '#7d3c98']], extra: [[10, 8, 2, 3, '#3a8a3a'], [11, 7, 1, 1, '#e3e']] },
-  hastrman: { skin: '#5ac08a', hat: [[3, 1, 6, 2, '#1a5a5a'], [4, 0, 4, 1, '#c9a05a']], extra: [[10, 5, 1, 2, '#6cf'], [10, 8, 2, 3, '#6cf'], [3, 11, 6, 1, '#2a8a8a']] },
-  polednice: { hat: [[3, 1, 6, 2, '#ffe060'], [2, 2, 1, 5, '#ffe060'], [9, 2, 1, 5, '#ffe060']], extra: [[10, 5, 1, 5, '#888'], [9, 4, 2, 1, '#ddd'], [3, 11, 6, 1, '#fff']] },
+  vedma: { hat: [[3, 1, 6, 3, '#7d3c98'], [2, 3, 1, 5, '#7d3c98'], [9, 3, 1, 5, '#7d3c98']], extra: [[3, 11, 6, 1, '#3a8a3a']] },
+  hastrman: { skin: '#5ac08a', hat: [[3, 1, 6, 2, '#1a5a5a'], [4, 0, 4, 1, '#c9a05a']], extra: [[3, 11, 6, 1, '#2a8a8a']] },
+  polednice: { hat: [[3, 1, 6, 2, '#ffe060'], [2, 2, 1, 5, '#ffe060'], [9, 2, 1, 5, '#ffe060']], extra: [[3, 11, 6, 1, '#fff']] },
   golem: { skin: '#9a9a86', big: true, hat: [], extra: [[5, 9, 2, 2, '#ee5']] },
   rarasek: { hat: [[3, 1, 6, 2, '#c0392b'], [5, 0, 2, 1, '#c0392b'], [6, -1, 1, 1, '#c0392b']], extra: [[10, 11, 2, 1, '#c0392b'], [11, 10, 1, 1, '#c0392b'], [3, 6, 6, 1, '#7a3a1a']] },
-  morana: { hat: [[3, 1, 6, 3, '#fff'], [3, 0, 1, 1, '#aee'], [5, 0, 1, 1, '#aee'], [8, 0, 1, 1, '#aee'], [2, 3, 1, 5, '#fff'], [9, 3, 1, 5, '#fff']], extra: [[10, 4, 1, 9, '#9cf'], [9, 3, 3, 1, '#cff']] },
-  baba: { hat: [[3, 1, 6, 2, '#bbb'], [2, 3, 1, 3, '#bbb'], [9, 3, 1, 3, '#bbb']], extra: [[6, 5, 2, 1, '#b08060'], [10, 2, 1, 12, '#8a5a2a'], [9, 13, 3, 2, '#c9a05a']] },
+  morana: { hat: [[3, 1, 6, 3, '#fff'], [3, 0, 1, 1, '#aee'], [5, 0, 1, 1, '#aee'], [8, 0, 1, 1, '#aee'], [2, 3, 1, 5, '#fff'], [9, 3, 1, 5, '#fff']], extra: [[3, 11, 6, 1, '#cff']] },
+  baba: { hat: [[3, 1, 6, 2, '#bbb'], [2, 3, 1, 3, '#bbb'], [9, 3, 1, 3, '#bbb']], extra: [[6, 5, 2, 1, '#b08060'], [3, 11, 6, 1, '#c9a05a']] },
 };
 const shade = (hex, k) => '#' + [1, 3, 5].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
 export const heroSkin = (cls) => HERO[cls].skin || SKIN;
@@ -103,6 +103,65 @@ export function heroSprite(cls, frame) {
     rects(x, h.extra.map(([a, b, c, d, e]) => [a, b + bob, c, d, e]));
   });
   heroCache.set(key, s);
+  return s;
+}
+
+// ---------- held weapons: 12 kinds x 4 tiers (blade up, pivot = the grip) ----------
+// art letters: b blade/head, e edge/highlight, g guard/fitting, h handle, k grip end, j gem (a fitting on tiers 1-2)
+const ARM_ART = {
+  sword: { pv: [2.5, 9.5], art: ['..e..', '..e..', '.ebb.', '.ebb.', '.ebb.', '.ebb.', '.ebb.', '.ebb.', 'ggjgg', '..h..', '..h..', '..k..'] },
+  dagger: { pv: [2.5, 5.5], art: ['..e..', '.ebb.', '.ebb.', '.ebb.', 'ggjgg', '..h..', '..k..'] },
+  axe: { pv: [5.5, 8.5], art: ['..bbbh.', '.bbbeh.', 'bbbbeh.', '.bbeeh.', '..bb.h.', '.....j.', '.....h.', '.....h.', '.....h.', '.....h.', '.....k.'] },
+  hammer: { pv: [3, 8.5], art: ['gggggg', 'gbbebg', 'gbbebg', 'gggggg', '..hh..', '..hh..', '..hj..', '..hh..', '..hh..', '..hh..', '..kk..'] },
+  mace: { pv: [2.5, 7.5], art: ['..g..', '.gbg.', 'gbjbg', '.gbg.', '..g..', '..h..', '..h..', '..h..', '..h..', '..h..', '..k..'] },
+  spear: { pv: [2.5, 9.5], art: ['..e..', '.ebb.', '.ebb.', '..b..', '.ggg.', '..h..', '..h..', '..j..', '..h..', '..h..', '..h..', '..h..', '..h..', '..k..'] },
+  staff: { pv: [2.5, 8.5], art: ['.ggg.', 'gjjjg', 'gjjjg', '.ggg.', '..h..', '..h..', '..h..', '..h..', '..h..', '..h..', '..h..', '..k..'] },
+  wand: { pv: [1.5, 5.5], art: ['.j.', 'jej', '.j.', '.h.', '.h.', '.h.', '.h.', '.k.'] },
+  scythe: { pv: [6.5, 8.5], art: ['..eeebh.', '.ebb..h.', 'eb....h.', 'b.....h.', '......h.', '......g.', '......h.', '......h.', '......h.', '......h.', '......h.', '......k.'] },
+  club: { pv: [2.5, 7.5], art: ['.bbb.', 'bbebb', 'bgegb', 'bbebb', '.bbb.', '..h..', '..h..', '..h..', '..h..', '..h..', '..k..'] },
+  bow: { pv: [0.5, 4.5], art: ['..hhe', '.h..e', 'h...e', 'h...e', 'g...e', 'h...e', 'h...e', '.h..e', '..hhe'] },
+  flail: { pv: [2.5, 11.5], art: ['..g..', '.gbg.', 'gbjbg', '.gbg.', '..g..', '..e..', '.e...', '..e..', '.e...', '..e..', '..h..', '..h..', '..h..', '..k..'] },
+};
+const ARM_METAL = [
+  { b: '#8d949a', e: '#cfd5da', g: '#6b4a2a', h: '#8a5a2a', k: '#3a2a1a', j: '#6b4a2a' },
+  { b: '#b8c4d0', e: '#eaf2fa', g: '#c9a05a', h: '#6b4420', k: '#2a1a10', j: '#c9a05a' },
+  { b: '#d6dce4', e: '#ffffff', g: '#e8b830', h: '#7a2a2a', k: '#3a1010', j: '#e03030' },
+  { b: '#7ad8f0', e: '#e8feff', g: '#b070f0', h: '#2a2a5a', k: '#10102a', j: '#ff5adf' },
+];
+const ARM_WOOD = [
+  { b: '#a0702e', e: '#c99a54', g: '#6b4a2a', h: '#8a5a2a', k: '#4a3018', j: '#c9a05a' },
+  { b: '#7a4a22', e: '#a06a38', g: '#8d949a', h: '#6b4420', k: '#2a1a10', j: '#8d949a' },
+  { b: '#4a2a14', e: '#7a5030', g: '#e8b830', h: '#7a2a2a', k: '#3a1010', j: '#e03030' },
+  { b: '#4a3a8a', e: '#8a70e0', g: '#7ad8f0', h: '#2a2a5a', k: '#10102a', j: '#ff5adf' },
+];
+const armCache = new Map();
+export function armSprite(id) {                 // id like 'sword3' = type + tier
+  let s = armCache.get(id);
+  if (s) return s;
+  const type = id.slice(0, -1), tier = +id.slice(-1), a = ARM_ART[type];
+  if (!a) return null;
+  const mat = ARM_TYPES[type].mat === 'wood' ? ARM_WOOD : ARM_METAL;
+  s = fromArt(a.art, mat[tier - 1]);
+  s.px = a.pv[0] + 1; s.py = a.pv[1] + 1;      // +1: the outline pad
+  armCache.set(id, s);
+  return s;
+}
+// upgrade glow: +3..+5 green, +6..+8 blue, +9 gold
+export const armGlow = (plus) => plus >= 9 ? '#ffd23f' : plus >= 6 ? '#6cf' : plus >= 3 ? '#7dff7d' : null;
+
+// ---------- passive icons (14x14-ish) ----------
+const PASSIVE_ART = {
+  srdce: { pal: { r: '#e33', w: '#fcc' }, art: ['.rr...rr.', 'rrrr.rrrr', 'rwrrrrrrr', 'rrrrrrrrr', '.rrrrrrr.', '..rrrrr..', '...rrr...', '....r....'] },
+  boty: { pal: { b: '#c9742a', w: '#e8a050', k: '#4a2a10' }, art: ['..bbbb...', '..bbbb...', '..bwbb...', '..bbbb...', '..bbbb...', '.bbbbbbb.', 'bbbbbbbbb', 'kkkkkkkkk'] },
+  sila: { pal: { y: '#f2c38f', o: '#d89a60', c: '#c0392b' }, art: ['..yyyyy..', '.yyyyyyy.', 'yyoyoyoyy', 'yyyyyyyyy', 'yyyyyyyyy', '.yyyyyyy.', '.ccccccc.', '.ccccccc.'] },
+  spech: { pal: { f: '#b0743a', c: '#cff', s: '#ffd23f' }, art: ['fffffff', 'fcccccf', '.fcscf.', '..fsf..', '...f...', '..fsf..', '.fsssf.', 'fsssssf', 'fffffff'] },
+  magnet: { pal: { r: '#e33', b: '#38f', w: '#eee' }, art: ['www...www', 'rrr...bbb', 'rrr...bbb', 'rrr...bbb', 'rrrr.bbbb', '.rrrbbbb.', '..rrbbb..', '...rbb...'] },
+  moudrost: { pal: { b: '#5a3aa8', w: '#f4ecd8', k: '#a09070' }, art: ['.bbbbb.bbbbb.', 'bwwwwwbwwwwwb', 'bwkkwwbwwkkwb', 'bwwwwwbwwwwwb', 'bwkkkwbwkkwwb', 'bwwwwwbwwwwwb', '.bbbbbbbbbbb.'] },
+};
+const passCache = new Map();
+export function passiveSprite(id) {
+  let s = passCache.get(id);
+  if (!s && PASSIVE_ART[id]) { s = fromArt(PASSIVE_ART[id].art, PASSIVE_ART[id].pal); passCache.set(id, s); }
   return s;
 }
 

@@ -1,9 +1,8 @@
 // Balance matrix: bots play every class through each dungeon at a typical power. Prints clear rates.
 import { CLASSES } from '../shared/data.js';
-import { newChar } from '../shared/meta.js';
-import { runBot } from './bot.js';
+import { runBot, geared } from './bot.js';
 
-const mk = (cls, lvl, i = 1) => { const c = newChar(i, 'b' + i, cls); c.level = lvl; for (const k of Object.keys(c.equip)) c.equip[k] = Math.min(20, 1 + Math.floor(lvl / 6)); return c; };
+const mk = (cls, lvl, i = 1) => geared(cls, lvl, i);
 const SCEN = [
   ['s1 lvl1', 's1', [1]], ['s2 lvl8', 's2', [8]], ['s3 lvl18', 's3', [18]],
   ['m1 2x lvl5', 'm1', [5, 5]], ['m2 3x lvl12', 'm2', [12, 12, 12]], ['m3 4x lvl25', 'm3', [25, 25, 25, 25]],

@@ -112,5 +112,44 @@ export const DUNGEONS = {
 export const DUNGEON = Object.fromEntries([...DUNGEONS.single, ...DUNGEONS.multi].map((d) => [d.id, d]));
 
 // ---- equipment ----
-export const SLOTS = ['weapon', 'armor', 'ring', 'boots'];
+export const SLOTS = ['armor', 'ring', 'boots'];      // the weapon slot is the armory below
 export const MAX_EQUIP = 20;
+
+// ---- held weapons (the armory): 12 kinds x 4 tiers = 48. Each character owns some, holds one, and upgrades each to +9 ----
+export const MAX_PLUS = 9;
+// type: dmg factor, perk stat (hp | spd | cd | magnet | null), mat = what the blade is made of (sprite palette)
+export const ARM_TYPES = {
+  sword:  { dmg: 1.04, perk: 'hp',     mat: 'metal' },  dagger: { dmg: 1.00, perk: 'spd',    mat: 'metal' },
+  axe:    { dmg: 1.10, perk: null,     mat: 'metal' },  hammer: { dmg: 1.10, perk: 'hp',     mat: 'metal' },
+  mace:   { dmg: 1.06, perk: 'magnet', mat: 'metal' },  spear:  { dmg: 1.02, perk: 'magnet', mat: 'metal' },
+  staff:  { dmg: 1.00, perk: 'cd',     mat: 'wood' },   wand:   { dmg: 1.00, perk: 'cd',     mat: 'wood' },
+  scythe: { dmg: 1.08, perk: 'magnet', mat: 'metal' },  club:   { dmg: 1.06, perk: 'hp',     mat: 'wood' },
+  bow:    { dmg: 1.02, perk: 'spd',    mat: 'wood' },   flail:  { dmg: 1.04, perk: 'spd',    mat: 'metal' },
+};
+// tier: base damage, character level needed, price (coins), perk strength
+export const ARM_TIERS = [
+  { dmg: 1.00, need: 1,  price: 120,  perk: 0.02 },
+  { dmg: 1.20, need: 8,  price: 600,  perk: 0.035 },
+  { dmg: 1.45, need: 20, price: 2200, perk: 0.05 },
+  { dmg: 1.75, need: 40, price: 6000, perk: 0.07 },
+];
+const ARM_NAMES = {      // [cs, en] for tiers 1..4
+  sword:  [['Rezavý meč', 'Rusty Sword'], ['Ocelový meč', 'Steel Sword'], ['Meč bohatýra', "Hero's Blade"], ['Svatovítův meč', "Svantevit's Blade"]],
+  dagger: [['Kuchyňský nůž', 'Kitchen Knife'], ['Zbojnická dýka', "Brigand's Dagger"], ['Stříbrný stylet', 'Silver Stiletto'], ['Dýka Černoboha', "Chernobog's Dagger"]],
+  axe:    [['Sekyrka', 'Hatchet'], ['Valaška', 'Valaška'], ['Bradatice', 'Bearded Axe'], ['Perunova sekera', "Perun's Axe"]],
+  hammer: [['Kovářské kladivo', "Smith's Hammer"], ['Perlík', 'War Pick'], ['Bitevní kladivo', 'Battle Hammer'], ['Svarožího kladivo', "Svarog's Hammer"]],
+  mace:   [['Dřevěná bulava', 'Wooden Mace'], ['Železná bulava', 'Iron Mace'], ['Ostnatá bulava', 'Spiked Mace'], ['Hetmanská bulava', "Hetman's Mace"]],
+  spear:  [['Vidle', 'Pitchfork'], ['Kopí', 'Spear'], ['Partyzána', 'Partisan'], ['Čertův trojzubec', "Devil's Trident"]],
+  staff:  [['Dřevěná hůl', 'Wooden Staff'], ['Poutnická hůl', "Pilgrim's Staff"], ['Krakonošova hůl', "Krakonos' Staff"], ['Mořanina hůl', "Morana's Staff"]],
+  wand:   [['Lískový proutek', 'Hazel Twig'], ['Kouzelná hůlka', 'Magic Wand'], ['Čarodějná hůlka', "Witch's Wand"], ['Hůlka Živy', "Živa's Wand"]],
+  scythe: [['Srp', 'Sickle'], ['Kosa', 'Scythe'], ['Kosa polednice', "Noon Witch's Scythe"], ['Kosa Smrtky', "Death's Scythe"]],
+  club:   [['Dřevěný kyj', 'Wooden Cudgel'], ['Okovaný kyj', 'Studded Cudgel'], ['Dubový kyj', 'Oak Cudgel'], ['Obrův kyj', "Giant's Club"]],
+  bow:    [['Jednoduchý luk', 'Simple Bow'], ['Lovecký luk', 'Hunting Bow'], ['Tisový luk', 'Yew Bow'], ['Zlatý luk', 'Golden Bow']],
+  flail:  [['Hrubý cep', "Thresher's Flail"], ['Bojový cep', 'War Flail'], ['Husitský řemdih', 'Hussite Flail'], ['Hromový cep', 'Thunder Flail']],
+};
+export const ARMS = Object.entries(ARM_NAMES).flatMap(([type, names]) => names.map(([cs, en], i) => {
+  const T = ARM_TIERS[i], Y = ARM_TYPES[type];
+  return { id: type + (i + 1), type, tier: i + 1, cs, en, dmg: T.dmg * Y.dmg, perk: Y.perk, perkVal: T.perk, need: T.need, price: T.price };
+}));
+export const ARM = Object.fromEntries(ARMS.map((w) => [w.id, w]));
+export const STARTER = 'staff1';          // every character starts with it (free)

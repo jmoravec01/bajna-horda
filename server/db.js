@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { newChar, newProfile } from '../shared/meta.js';
+import { newChar, newProfile, fixArms } from '../shared/meta.js';
 
 const scrypt = promisify(scryptCb);
 export const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data');
@@ -27,6 +27,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS used_tickets (nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 `);
+// armory columns (added after the first release); old rows are converted lazily by fixArms
+for (const col of ['arms', 'held']) if (!db.prepare('PRAGMA table_info(chars)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE chars ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
 
 export const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 // lookalike names share a key: case, accents and the usual digit/letter swaps are folded
@@ -60,7 +62,7 @@ export const q = {
   insChar: db.prepare('INSERT INTO chars (user_id, name, cls, created) VALUES (?, ?, ?, ?)'),
   delChar: db.prepare('DELETE FROM chars WHERE id = ? AND user_id = ?'),
   saveUser: db.prepare('UPDATE users SET coins = ?, prog_single = ?, prog_multi = ? WHERE id = ?'),
-  saveChar: db.prepare('UPDATE chars SET level = ?, xp = ?, e_weapon = ?, e_armor = ?, e_ring = ?, e_boots = ? WHERE id = ?'),
+  saveChar: db.prepare('UPDATE chars SET level = ?, xp = ?, e_armor = ?, e_ring = ?, e_boots = ?, arms = ?, held = ? WHERE id = ?'),
   useTicket: db.prepare('INSERT OR IGNORE INTO used_tickets (nonce, expires) VALUES (?, ?)'),
   ticketUsed: db.prepare('SELECT 1 FROM used_tickets WHERE nonce = ?'),
   purgeTickets: db.prepare('DELETE FROM used_tickets WHERE expires <= ?'),
@@ -78,7 +80,10 @@ export function newSession(userId, days = 365) {
   q.insSession.run(sha256(token), userId, Date.now() + days * 864e5);
   return token;
 }
-const rowChar = (r) => ({ id: r.id, name: r.name, cls: r.cls, level: r.level, xp: r.xp, equip: { weapon: r.e_weapon, armor: r.e_armor, ring: r.e_ring, boots: r.e_boots } });
+const rowChar = (r) => {
+  let arms; try { arms = r.arms ? JSON.parse(r.arms) : undefined; } catch { /* a damaged value is rebuilt by fixArms */ }
+  return fixArms({ id: r.id, name: r.name, cls: r.cls, level: r.level, xp: r.xp, equip: { weapon: r.e_weapon, armor: r.e_armor, ring: r.e_ring, boots: r.e_boots }, arms, held: r.held });
+};
 export function loadProfile(userId) {
   const u = q.user.get(userId); if (!u) return null;
   const p = newProfile();
@@ -90,7 +95,7 @@ export function saveProfile(userId, p) {
   db.exec('BEGIN');
   try {
     q.saveUser.run(Math.floor(p.coins), p.progress.single, p.progress.multi, userId);
-    for (const c of p.chars) q.saveChar.run(c.level, c.xp, c.equip.weapon, c.equip.armor, c.equip.ring, c.equip.boots, c.id);
+    for (const c of p.chars) q.saveChar.run(c.level, c.xp, c.equip.armor, c.equip.ring, c.equip.boots, JSON.stringify(c.arms), c.held, c.id);
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
 }

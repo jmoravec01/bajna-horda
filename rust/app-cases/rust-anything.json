@@ -20,6 +20,20 @@
     ]
   },
   "recorded": [
+    "arm-anon",
+    "arm-bad-char",
+    "arm-bad-op",
+    "arm-buy-level",
+    "arm-buy-ok",
+    "arm-buy-proto",
+    "arm-buy-unknown",
+    "arm-equip-notowned",
+    "arm-equip-ok",
+    "arm-no-id",
+    "arm-str-char",
+    "arm-up-notowned",
+    "arm-up-ok",
+    "arm-up-starter",
     "chars-anon",
     "chars-badclass",
     "chars-badname",
@@ -61,6 +75,7 @@
     "upgrade-bad-char",
     "upgrade-bad-slot",
     "upgrade-ok",
-    "upgrade-str-char"
+    "upgrade-str-char",
+    "upgrade-weapon-slot-gone"
   ]
 }

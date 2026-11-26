@@ -2,7 +2,7 @@
 import { randomInt } from 'node:crypto';
 import { Sim } from '../shared/sim.js';
 import { DT, DUNGEONS, DUNGEON, MAX_PLAYERS, CLASS } from '../shared/data.js';
-import { power, applyRun, validName, newChar, unlocked } from '../shared/meta.js';
+import { power, applyRun, validName, newChar, unlocked, armOf } from '../shared/meta.js';
 import { db, loadProfile, saveProfile, getChar } from './db.js';
 
 const rooms = new Map();          // code -> Room
@@ -123,10 +123,10 @@ function leave(m) {
 
 function startRun(room) {
   const members = [...room.members.values()];
-  const players = members.map((x) => ({ name: x.char.name, cls: x.char.cls, level: x.char.level, equip: x.char.equip }));
+  const players = members.map((x) => ({ name: x.char.name, cls: x.char.cls, level: x.char.level, equip: x.char.equip, arms: x.char.arms, held: x.char.held }));
   room.sim = new Sim({ seed: randomInt(2 ** 31), dungeonId: room.dun, players });
   room.state = 'run'; room.evbuf = []; room.acc = 0; room.last = performance.now();
-  const list = members.map((x, i) => { x.pid = i + 1; x.left = false; return { id: x.pid, name: x.char.name, cls: x.char.cls }; });
+  const list = members.map((x, i) => { x.pid = i + 1; x.left = false; return { id: x.pid, name: x.char.name, cls: x.char.cls, arm: armOf(x.char)[0].id, plus: armOf(x.char)[1] }; });
   for (const x of members) send(x, { t: 'start', dun: room.dun, you: x.pid, players: list });
   room.timer = setInterval(() => tick(room), 25);
 }

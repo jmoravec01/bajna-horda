@@ -1,5 +1,5 @@
 // Server API + WebSocket client + local (guest) profile. Everything the UI needs to talk to a profile lives here.
-import { newProfile, createChar, upgradeEquip, applyRun } from '../shared/meta.js';
+import { newProfile, createChar, upgradeEquip, applyRun, armError, fixArms } from '../shared/meta.js';
 
 const META = document.querySelector('meta[name="horde-api"]')?.content || '';
 export const OFFLINE = META === 'none';
@@ -32,7 +32,7 @@ export const profile = {
       try { const j = await call('GET', 'me'); this.p = j.profile; this.room = j.room; this.user = j.user; return true; }
       catch (e) { if (e.message === 'unauthorized') { store.d.token = null; store.d.user = null; store.save(); } else throw e; }
     }
-    if (store.d.guest) { this.p = store.d.guest; this.user = null; this.room = null; return true; }
+    if (store.d.guest) { store.d.guest.chars.forEach(fixArms); this.p = store.d.guest; this.user = null; this.room = null; return true; }
     return false;
   },
   startGuest() { store.d.guest = store.d.guest || newProfile(); store.save(); this.p = store.d.guest; this.user = null; },
@@ -53,6 +53,10 @@ export const profile = {
   async upgrade(charId, slot) {
     if (this.isGuest) { const err = upgradeEquip(this.p, charId, slot); if (err) throw new Error(err); store.save(); return; }
     this.p = (await call('POST', 'upgrade', { charId, slot })).profile;
+  },
+  async arm(charId, op, id) {                    // buy | up | equip a held weapon
+    if (this.isGuest) { const err = armError(this.p, charId, op, id); if (err) throw new Error(err); store.save(); return; }
+    this.p = (await call('POST', 'arm', { charId, op, id })).profile;
   },
   // guests only: their progress lives in this browser. Signed-in runs are simulated and paid out by the server.
   runFinishLocal(charId, r) {

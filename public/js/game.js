@@ -2,7 +2,7 @@
 import { Sim } from '../shared/sim.js';
 import { DT, DUNGEON, WEAPONS, PASSIVE, WEAPON_IDX } from '../shared/data.js';
 import { Scene, render } from './render.js';
-import { objSprite, text } from './sprites.js';
+import { objSprite, passiveSprite, text } from './sprites.js';
 import { sfx, music } from './audio.js';
 import { t, nm, ds } from './i18n.js';
 
@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 function iconCanvas(kind, id) {
   const c = document.createElement('canvas'); c.width = 16; c.height = 16; c.className = 'icon';
   const x = c.getContext('2d');
-  const sp = kind === 'w' ? objSprite(WEAPON_IDX[id]) : null;
+  const sp = kind === 'w' ? objSprite(WEAPON_IDX[id]) : kind === 'p' ? passiveSprite(id) : null;
   if (sp) x.drawImage(sp, 8 - (sp.width >> 1), 8 - (sp.height >> 1));
   else { x.fillStyle = kind === 'w' ? '#4a6fd4' : '#3aa86a'; x.fillRect(2, 2, 12, 12); x.fillStyle = '#0006'; x.fillRect(2, 12, 12, 2); text(x, id[0], 6, 5, '#fff'); }
   return c;

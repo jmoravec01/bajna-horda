@@ -1,6 +1,6 @@
 // Scene: interpolates between two snapshots. Renderer: draws one frame onto the small pixel canvas.
 import { DUNGEON, ARCH, CLASS, WEAPONS } from '../shared/data.js';
-import { heroSkin, heroSprite, enemySprite, enemyRadius, enemyFor, objSprite, pickSprite, bulletSprite, ground, text, textWidth } from './sprites.js';
+import { armSprite, armGlow, heroSkin, heroSprite, enemySprite, enemyRadius, enemyFor, objSprite, pickSprite, bulletSprite, ground, text, textWidth } from './sprites.js';
 
 export class Scene {
   constructor(dun, meId, players) {
@@ -57,20 +57,34 @@ function line(x, x0, y0, x1, y1, col) {
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
   for (let n = 0; n < 400; n++) { x.fillRect(x0, y0, 1, 1); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
 }
+// the held weapon, blade up at ang = 0, gripped at (gx, gy); +3 and more upgrade levels sparkle
+export function drawHeld(x, held, gx, gy, ang, now) {
+  const s = held.s, col = armGlow(held.plus);
+  x.save(); x.translate(Math.round(gx), Math.round(gy)); x.rotate(ang); x.drawImage(s, -Math.round(s.px), -Math.round(s.py)); x.restore();
+  if (!col) return;
+  const len = s.py - 1, n = held.plus >= 9 ? 3 : held.plus >= 6 ? 2 : 1;
+  x.fillStyle = col;
+  for (let i = 0; i < n; i++) {
+    const u = (now / 420 + i / n) % 1, along = len * (0.25 + 0.75 * u), off = Math.sin(now / 90 + i * 2) * 2;
+    x.globalAlpha = 1 - u * 0.6;
+    x.fillRect(Math.round(gx + Math.sin(ang) * along + Math.cos(ang) * off), Math.round(gy - Math.cos(ang) * along + Math.sin(ang) * off), 1, 1);
+  }
+  x.globalAlpha = 1;
+}
 // ---------- attack animation: the hero swings / throws / casts when a weapon fires ----------
 const ATK_MS = 300;
-function atkFx(x, kind, wix, hx, hy, ang, t, skin, sleeve) {
+function atkFx(x, kind, wix, hx, hy, ang, t, skin, sleeve, held, now) {
   const ca = Math.cos(ang), sa = Math.sin(ang), e = Math.sin(Math.PI * t), R = Math.round;
-  const hand = (ex, ey) => { line(x, hx, hy, ex, ey, sleeve); x.fillStyle = skin; x.fillRect(R(ex) - 1, R(ey) - 1, 2, 2); };
+  const hand = (ex, ey, hold) => { line(x, hx, hy, ex, ey, sleeve); if (hold && held) drawHeld(x, held, ex, ey, Math.atan2(ey - hy, ex - hx) + Math.PI / 2, now); x.fillStyle = skin; x.fillRect(R(ex) - 1, R(ey) - 1, 2, 2); };
   const obj = (ex, ey, a) => { const s = objSprite(wix); if (!s) return; x.save(); x.translate(R(ex), R(ey)); x.rotate(a + Math.PI / 2); x.drawImage(s, -(s.width >> 1), -(s.height >> 1)); x.restore(); };
   const spark = (cx, cy, cols, n, spread) => { const f = (t * 24) | 0; for (let i = 0; i < n; i++) { x.fillStyle = cols[i % cols.length]; x.fillRect(R(cx) + ((i * 5 + f * 3) % (spread * 2 + 1)) - spread, R(cy) + ((i * 3 + f * 5) % (spread * 2 + 1)) - spread, 1, 1); } };
   switch (kind) {
     case 'pulse':
       if (wix === 7) {                                                    // noon ring: both arms up, the sun flares
-        hand(hx - 4, hy - 3 - 5 * e); hand(hx + 4, hy - 3 - 5 * e); disc(x, hx, R(hy - 10 - 2 * e), 2, '#ffe060', 1 - t);
+        hand(hx - 4, hy - 3 - 5 * e); hand(hx + 4, hy - 3 - 5 * e, true); disc(x, hx, R(hy - 10 - 2 * e), 2, '#ffe060', 1 - t);
       } else {                                                            // club / fist: a wide overhead swing with a trail
         const a = ang - 1.4 + 2.8 * Math.min(1, t * 1.5), r = 8, ex = hx + Math.cos(a) * r, ey = hy + Math.sin(a) * r;
-        hand(ex, ey); obj(ex + Math.cos(a) * 4, ey + Math.sin(a) * 4, a);
+        hand(ex, ey, true); if (!held) obj(ex + Math.cos(a) * 4, ey + Math.sin(a) * 4, a);
         if (t < 0.8) for (let i = 1; i <= 5; i++) { const b = a - i * 0.3; x.globalAlpha = (1 - i / 6) * (1 - t); x.fillStyle = '#fff'; x.fillRect(R(hx + Math.cos(b) * 13), R(hy + Math.sin(b) * 13), 1, 1); x.globalAlpha = 1; }
       }
       break;
@@ -80,22 +94,23 @@ function atkFx(x, kind, wix, hx, hy, ang, t, skin, sleeve) {
       break;
     }
     case 'chain': {                                                       // one arm points at the target, sparks crackle
-      const ex = hx + ca * 7, ey = hy + sa * 7; hand(ex, ey); hand(hx - 4, hy - 5); spark(ex, ey, ['#fff6a0', '#8ad0ff'], 5, 3); break;
+      const ex = hx + ca * 7, ey = hy + sa * 7; hand(ex, ey, true); hand(hx - 4, hy - 5); spark(ex, ey, ['#fff6a0', '#8ad0ff'], 5, 3); break;
     }
     case 'bomb': {                                                        // lob over the shoulder
       const u = Math.min(1, t / 0.6), ex = hx + ca * (-4 + 10 * u), ey = hy + sa * (-4 + 10 * u) - 8 * Math.sin(Math.PI * u);
       hand(ex, ey); if (u < 0.7) obj(ex, ey - 3, 0); break;
     }
     case 'zone': {                                                        // palm out, a puff of magic
-      const ex = hx + ca * 6, ey = hy + sa * 6 + 1; hand(ex, ey);
+      const ex = hx + ca * 6, ey = hy + sa * 6 + 1; hand(ex, ey, true);
       x.fillStyle = wix === 5 ? '#7ee05a' : '#6cf'; x.globalAlpha = 1 - t;
       for (let i = 0; i < 5; i++) { const an = i * 1.26 + t * 3, r = 2 + t * 8; x.fillRect(R(ex + Math.cos(an) * r), R(ey + Math.sin(an) * r * 0.7), 2, 2); }
       x.globalAlpha = 1; break;
     }
-    case 'turret': hand(hx - 4, hy - 1 - 8 * e); hand(hx + 4, hy - 1 - 8 * e); spark(hx, hy - 6, ['#ffe060', '#fff'], 4, 5); break;
-    case 'orbit': hand(hx - 5, hy - 4 - 2 * e); hand(hx + 5, hy - 4 - 2 * e); ring(x, hx, hy + 1, 9, '#c9a05a', 0.8 * (1 - t)); break;
+    case 'turret': hand(hx - 4, hy - 1 - 8 * e); hand(hx + 4, hy - 1 - 8 * e, true); spark(hx, hy - 6, ['#ffe060', '#fff'], 4, 5); break;
+    case 'orbit': hand(hx - 5, hy - 4 - 2 * e); hand(hx + 5, hy - 4 - 2 * e, true); ring(x, hx, hy + 1, 9, '#c9a05a', 0.8 * (1 - t)); break;
   }
 }
+const ARM_IN_HAND = new Set(['pulse', 'chain', 'zone', 'turret', 'orbit']);   // attacks where the hand (and the weapon in it) moves
 const RING_COL = { 4: '#f5a142', 7: '#ffe060', 8: '#cfcfcf', 5: '#f0a', 6: '#aee' };
 
 export function render(ctx, W, H, sc, now, lastDir) {
@@ -159,7 +174,7 @@ export function render(ctx, W, H, sc, now, lastDir) {
       if (e[1] === 5 || e[1] === 6) { const bw = Math.max(14, w); ctx.fillStyle = '#000'; ctx.fillRect(px - (bw >> 1) - 1, py - h - 4, bw + 2, 4); ctx.fillStyle = e[1] === 6 ? '#e33' : '#f90'; ctx.fillRect(px - (bw >> 1), py - h - 3, Math.round(bw * e[4] / 100), 2); }
     } else {
       const pl = sc.players.find((q) => q.id === e[0]) || { cls: 'bohatyr', name: '?' };
-      const moving = e[0] === sc.meId ? lastDir : 1, fr = (moving && !e[5]) ? (Math.floor(now / 140) & 1) : 0, spr = heroSprite(pl.cls, fr);
+      const arm = pl.arm && armSprite(pl.arm) ? { s: armSprite(pl.arm), plus: pl.plus || 0 } : null, moving = e[0] === sc.meId ? lastDir : 1, fr = (moving && !e[5]) ? (Math.floor(now / 140) & 1) : 0, spr = heroSprite(pl.cls, fr);
       let px = sx(x), py = sy(y), face = e[6] < 0 ? -1 : 1, atk = null;
       const at = sc.atk.get(e[0]), t = at ? (now - at.t) / ATK_MS : 1;
       if (at && t < 1 && !e[5]) {                                          // aim at the nearest enemy, lunge a little, then draw the arm/weapon on top
@@ -175,9 +190,12 @@ export function render(ctx, W, H, sc, now, lastDir) {
       ctx.save(); ctx.translate(px, py - 1);
       if (face < 0) ctx.scale(-1, 1);
       if (e[5]) { ctx.globalAlpha = 0.45; ctx.rotate(Math.PI / 2); ctx.drawImage(spr, -(spr.width >> 1), -(spr.height >> 1) + 2); }
-      else ctx.drawImage(spr, -(spr.width >> 1), -(spr.height >> 1));
+      else {
+        ctx.drawImage(spr, -(spr.width >> 1), -(spr.height >> 1));
+        if (arm && !(atk && ARM_IN_HAND.has(atk[0]))) drawHeld(ctx, arm, pl.cls === 'golem' ? 7 : 5, 2 + fr, 0.45, now);     // idle: in the right hand
+      }
       ctx.restore();
-      if (atk) atkFx(ctx, atk[0], atk[1], px, py - 3, atk[2], atk[3], heroSkin(pl.cls), CLASS[pl.cls].col);
+      if (atk) atkFx(ctx, atk[0], atk[1], px, py - 3, atk[2], atk[3], heroSkin(pl.cls), CLASS[pl.cls].col, arm, now);
       if (e[5] && e[8] > 0) { ctx.fillStyle = '#000'; ctx.fillRect(px - 8, py - 12, 16, 3); ctx.fillStyle = '#7f7'; ctx.fillRect(px - 7, py - 11, Math.round(14 * Math.min(1, e[8] / 3)), 1); }
       if (sc.players.length > 1) { const nm = pl.name.slice(0, 8), w = textWidth(nm); text(ctx, nm, px - (w >> 1), py - 16, e[0] === sc.meId ? '#fe7' : '#fff'); }
       if (e[0] !== sc.meId && !e[5]) { ctx.fillStyle = '#000'; ctx.fillRect(px - 7, py - 11, 14, 2); ctx.fillStyle = '#e44'; ctx.fillRect(px - 7, py - 11, Math.round(14 * e[3] / e[4]), 2); }

@@ -3,6 +3,14 @@ import { Sim } from '../shared/sim.js';
 import { DT, CLASSES } from '../shared/data.js';
 import { newChar } from '../shared/meta.js';
 
+// a character with typical gear for its level: every slot at 1 + level/6, a plain sword upgraded as far
+export function geared(cls, lvl, id = 1) {
+  const c = newChar(id, 'b' + id, cls), k = Math.min(20, 1 + Math.floor(lvl / 6));
+  c.level = lvl; for (const slot of Object.keys(c.equip)) c.equip[slot] = k;
+  c.arms = { sword1: Math.min(9, k - 1) }; c.held = 'sword1';
+  return c;
+}
+
 export function botStep(sim, p) {
   if (p.dead) { sim.setInput(p.id, 0, 0); return; }
   while (p.pending.length) sim.choose(p.id, 0);
@@ -30,8 +38,7 @@ if (process.argv[1] && process.argv[1].endsWith('bot.js')) {
   const t0 = Date.now();
   const list = cls === 'all' ? CLASSES.map((c) => c.id) : cls.split(',');
   for (const c of list) {
-    const ch = newChar(1, 'bot', c); ch.level = +lvl;
-    const lv = +lvl; for (const k of Object.keys(ch.equip)) ch.equip[k] = Math.min(20, 1 + Math.floor(lv / 6));
+    const ch = geared(c, +lvl);
     const sim = runBot({ dungeonId: dun, chars: [ch] });
     const p = sim.players[0];
     console.log(c.padEnd(10), 'cleared', sim.over.cleared, 'time', Math.round(sim.over.time), 'lvl', p.level, 'kills', p.kills, 'hp', Math.round(p.hp) + '/' + p.maxHp, 'weapons', p.weapons.map((w) => w.id + w.lvl).join(','));
