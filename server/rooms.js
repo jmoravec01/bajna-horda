@@ -2,7 +2,7 @@
 import { randomInt } from 'node:crypto';
 import { Sim } from '../shared/sim.js';
 import { DT, DUNGEONS, DUNGEON, MAX_PLAYERS, CLASS } from '../shared/data.js';
-import { power, applyRun, validName, newChar } from '../shared/meta.js';
+import { power, applyRun, validName, newChar, unlocked } from '../shared/meta.js';
 import { db, loadProfile, saveProfile, getChar } from './db.js';
 
 const rooms = new Map();          // code -> Room
@@ -51,6 +51,7 @@ function handle(m, text) {
   switch (d.t) {
     case 'ping': send(m, { t: 'pong', n: Number(d.n) || 0 }); break;
     case 'open': open(m); break;
+    case 'solo': solo(m, String(d.dun || '')); break;
     case 'join': join(m, String(d.code || '').toUpperCase().slice(0, 8)); break;
     case 'in': if (room?.sim && m.pid && !m.left) room.sim.setInput(m.pid, Number(d.dx), Number(d.dy)); break;
     case 'pick': if (room?.sim && m.pid && !m.left) room.sim.choose(m.pid, Number(d.i) | 0); break;
@@ -81,12 +82,23 @@ function open(m) {
   broadcast(room);
 }
 
+// A single-player run is a private one-player room: the server runs the sim, so coins/xp/progress cannot be faked.
+function solo(m, dun) {
+  if (m.room) return;
+  if (!m.userId || !m.char?.id) { send(m, { t: 'err', code: 'need_account' }); return; }
+  const d = Object.hasOwn(DUNGEON, dun) ? DUNGEON[dun] : null;
+  if (!d || d.mode !== 'single' || !unlocked(loadProfile(m.userId), d)) { send(m, { t: 'err', code: 'bad' }); return; }
+  const room = { code: '~' + m.id, solo: true, ownerId: m.userId, ownerName: m.name, members: new Map(), state: 'lobby', dun, sim: null, timer: null, evbuf: [], last: 0, acc: 0 };
+  rooms.set(room.code, room); room.members.set(m.id, m); m.room = room;
+  startRun(room);
+}
+
 function join(m, code) {
   if (m.room) return;
   if (!m.char) { send(m, { t: 'err', code: 'need_char' }); return; }
   const now = Date.now(), im = ipMiss.get(m.ip), blocked = im && im.n >= 20 && im.reset > now;
   const room = blocked ? null : rooms.get(code);
-  if (!room) {
+  if (!room || room.solo) {
     m.misses = (m.misses || 0) + 1; if (m.misses >= 5) m.conn.close(1008);
     const e = !im || im.reset <= now ? { n: 0, reset: now + 600e3 } : im; e.n++; ipMiss.set(m.ip, e);
     send(m, { t: 'err', code: 'not_found' }); return;
@@ -99,6 +111,10 @@ function join(m, code) {
 
 function leave(m) {
   const room = m.room; if (!room) return;
+  if (room.solo) {                                  // quitting or dropping pays out what was earned so far
+    if (room.sim && !room.sim.over) { room.sim.finish(false); endRun(room); }
+    clearInterval(room.timer); rooms.delete(room.code); m.room = null; m.left = true; return;
+  }
   m.room = null; room.members.delete(m.id); m.left = true;
   if (room.sim && m.pid) { const p = room.sim.players[m.pid - 1]; if (p) { p.hp = 0; p.dead = true; p.gone = true; } }
   if (!room.members.size) { clearInterval(room.timer); rooms.delete(room.code); return; }
@@ -144,7 +160,7 @@ function endRun(room) {
     if (x.userId && x.char.id && r) {
       try {
         const prof = loadProfile(x.userId), c = prof.chars.find((q) => q.id === x.char.id), before = c ? c.level : 1;
-        reward = applyRun(prof, x.char.id, { dungeonId: room.dun, kills: r.kills, coinsPicked: r.coins, timeSec: over.time, cleared: over.cleared, rewardMul: r.reward }) || {};
+        reward = applyRun(prof, x.char.id, { dungeonId: room.dun, kills: r.kills, coinsPicked: r.coins, timeSec: over.time, cleared: over.cleared && r.kills > 0, rewardMul: r.reward })   // an idle alt does not get the clear bonus || {};
         saveProfile(x.userId, prof);
         level = prof.chars.find((q) => q.id === x.char.id)?.level || before; levelUp = level - before;
         x.char = getChar(x.char.id, x.userId) || x.char;
@@ -154,6 +170,7 @@ function endRun(room) {
     x.pid = 0;
   }
   room.sim = null; room.state = 'lobby';
+  if (room.solo) { for (const x of room.members.values()) x.room = null; rooms.delete(room.code); return; }
   broadcast(room);
 }
 

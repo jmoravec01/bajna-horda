@@ -2,7 +2,7 @@
 use crate::meta::{new_profile, Char, Equip, Profile};
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
-use hmac::{Hmac, Mac};
+
 use rand::RngCore;
 use regex::Regex;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -67,12 +67,6 @@ pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 /// HMAC-SHA256, base64url, first 32 characters (same as the JS `sign`).
-pub fn sign(secret: &str, body: &str) -> String {
-    let mut m = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
-    m.update(body.as_bytes());
-    URL_SAFE_NO_PAD.encode(m.finalize().into_bytes())[..32].to_string()
-}
-
 impl Db {
     pub fn open(path: &str) -> rusqlite::Result<Db> {
         let c = Connection::open(path)?;
@@ -97,14 +91,6 @@ impl Db {
     }
     fn c(&self) -> std::sync::MutexGuard<'_, Connection> { self.0.lock().unwrap_or_else(|e| e.into_inner()) }
 
-    pub fn secret(&self, env: Option<String>) -> String {
-        if let Some(s) = env { if !s.is_empty() { return s; } }
-        let c = self.c();
-        if let Ok(Some(v)) = c.query_row("SELECT v FROM meta WHERE k = 'secret'", [], |r| r.get::<_, String>(0)).optional() { return v; }
-        let s = random_token(32);
-        let _ = c.execute("INSERT INTO meta (k, v) VALUES ('secret', ?)", [&s]);
-        s
-    }
     pub fn by_key(&self, key: &str) -> Option<Row> {
         self.c().query_row("SELECT id, name, pass FROM users WHERE name_key = ?", [key], |r| Ok(Row { id: r.get(0)?, name: r.get(1)?, pass: r.get(2)? })).optional().ok().flatten()
     }
@@ -136,9 +122,6 @@ impl Db {
     pub fn user(&self, id: i64) -> Option<User> {
         self.c().query_row("SELECT id, name, room FROM users WHERE id = ?", [id], |r| Ok(User { id: r.get(0)?, name: r.get(1)?, room: r.get(2)? })).optional().ok().flatten()
     }
-    pub fn owner_of_room(&self, code: &str) -> Option<(i64, String)> {
-        self.c().query_row("SELECT id, name FROM users WHERE room = ?", [code], |r| Ok((r.get(0)?, r.get(1)?))).optional().ok().flatten()
-    }
     pub fn load_profile(&self, user_id: i64) -> Option<Profile> {
         let c = self.c();
         let (coins, ps, pm): (i64, i64, i64) = c.query_row("SELECT coins, prog_single, prog_multi FROM users WHERE id = ?", [user_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional().ok().flatten()?;
@@ -163,8 +146,6 @@ impl Db {
     }
     pub fn insert_char(&self, user_id: i64, name: &str, cls: &str) { let _ = self.c().execute("INSERT INTO chars (user_id, name, cls, created) VALUES (?, ?, ?, ?)", params![user_id, name, cls, now_ms()]); }
     pub fn delete_char(&self, id: i64, user_id: i64) { let _ = self.c().execute("DELETE FROM chars WHERE id = ? AND user_id = ?", params![id, user_id]); }
-    pub fn ticket_used(&self, nonce: &str) -> bool { self.c().query_row("SELECT 1 FROM used_tickets WHERE nonce = ?", [nonce], |_| Ok(())).optional().ok().flatten().is_some() }
-    pub fn use_ticket(&self, nonce: &str, expires: i64) { let _ = self.c().execute("INSERT OR IGNORE INTO used_tickets (nonce, expires) VALUES (?, ?)", params![nonce, expires]); }
     pub fn purge(&self) {
         let now = now_ms();
         let c = self.c();

@@ -5,6 +5,7 @@ A pixel-art survivor game for phones, played in the browser. Move with one thumb
 - **Single player** (3 dungeons) and **co-op for up to 6 players** (3 other dungeons), each mode with its own progression.
 - **12 classes** (Krakonoš, Zbojník, Perun, Čert, Bohatýr, Vědma, Hastrman, Polednice, Golem, Rarášek, Morana, Bába Jaga), each with its own weapon and bonus. An account holds up to 8 characters and plays one at a time. Level and gear belong to the character, coins to the account.
 - Co-op difficulty follows the **strongest** player in the room, so a level 1 playing with a level 100 has a harder run (and earns a bonus for it).
+- **The server is the referee.** Signed-in players' runs (single and co-op) are simulated on the server; the client only sends its stick direction and level-up picks, and coins, XP, levels, unlocks and equipment are written to the database by the server. Guests play offline in the browser and their progress stays there.
 - Co-op worlds are joined by **three hero faces**: the host taps *Open world* and sees three pictures, friends tap the same three in the Multiplayer menu (or open the link).
 - Czech and English UI, no ads, no purchases.
 

@@ -65,24 +65,6 @@ test('characters: create, limit, delete, upgrade, other accounts are untouchable
   assert.equal((await api('GET', 'me', null, a.token)).j.profile.chars.length, 7);
 });
 
-test('single run: ticket, plausibility, replay protection, rewards persist', async () => {
-  const a = await reg('Runner'); await api('POST', 'chars', { name: 'Run', cls: 'golem' }, a.token);
-  const id = (await api('GET', 'me', null, a.token)).j.profile.chars[0].id;
-  assert.equal((await api('POST', 'run/start', { charId: id, dungeon: 's2' }, a.token)).status, 400);       // locked
-  assert.equal((await api('POST', 'run/start', { charId: id + 99, dungeon: 's1' }, a.token)).status, 400);   // not his
-  const { ticket } = (await api('POST', 'run/start', { charId: id, dungeon: 's1' }, a.token)).j;
-  const forged = ticket.slice(0, -2) + (ticket.endsWith('a') ? 'bb' : 'aa');
-  assert.equal((await api('POST', 'run/finish', { ticket: forged, kills: 1, coins: 0, time: 10, cleared: false }, a.token)).status, 400);
-  assert.equal((await api('POST', 'run/finish', { ticket, kills: 99999, coins: 0, time: 10, cleared: false }, a.token)).j.error, 'implausible');
-  assert.equal((await api('POST', 'run/finish', { ticket, kills: 10, coins: 0, time: 10, cleared: true }, a.token)).j.error, 'implausible');   // a clear needs the boss time
-  const ok = await api('POST', 'run/finish', { ticket, kills: 300, coins: 40, time: 420, cleared: true }, a.token);
-  assert.equal(ok.status, 200); assert.ok(ok.j.reward.xp > 0 && ok.j.profile.progress.single === 2);
-  assert.equal((await api('POST', 'run/finish', { ticket, kills: 300, coins: 40, time: 420, cleared: true }, a.token)).status, 409);   // replay
-  const b = await reg('Other');
-  assert.equal((await api('POST', 'run/finish', { ticket, kills: 1, coins: 0, time: 1, cleared: false }, b.token)).status, 400);        // not his ticket
-  assert.equal((await api('GET', 'me', null, a.token)).j.profile.progress.single, 2);
-});
-
 // ---- co-op ----
 const wsc = (qs) => new Promise((res, rej) => {
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?${qs}`), q = []; let wait = null;
@@ -124,6 +106,25 @@ test('co-op: guessing face combinations closes the socket after 5 misses', async
   const g = await wsc('nick=Guesser&cls=perun'), closed = new Promise((r) => { g.ws.onclose = r; });
   for (const code of ['AAA', 'BBB', 'CCC', 'DDD', 'EEE']) g.send({ t: 'join', code });
   await closed;
+});
+
+test('single run is simulated by the server: no client-reported results, quit pays out, locked/guest refused', async () => {
+  const a = await reg('Runner'); await api('POST', 'chars', { name: 'Run', cls: 'golem' }, a.token);
+  assert.equal((await api('POST', 'run/start', { charId: 1, dungeon: 's1' }, a.token)).status, 404);        // the self-reported ticket flow is gone
+  assert.equal((await api('POST', 'run/finish', { ticket: 'x', kills: 9e9, coins: 9e9, time: 400, cleared: true }, a.token)).status, 404);
+  const g = await wsc('nick=Gast&cls=perun'); g.send({ t: 'solo', dun: 's1' });
+  assert.equal((await g.next((m) => m.t === 'err')).code, 'need_account'); g.ws.close();
+  const c = await wsc(`token=${a.token}`);
+  c.send({ t: 'solo', dun: 's2' }); assert.equal((await c.next((m) => m.t === 'err')).code, 'bad');           // locked
+  c.send({ t: 'solo', dun: 'm1' }); assert.equal((await c.next((m) => m.t === 'err')).code, 'bad');           // not a single-player dungeon
+  c.send({ t: 'solo', dun: '__proto__' }); assert.equal((await c.next((m) => m.t === 'err')).code, 'bad');
+  c.send({ t: 'solo', dun: 's1' });
+  const st = await c.next((m) => m.t === 'start'); assert.equal(st.dun, 's1'); assert.equal(st.players.length, 1);
+  assert.ok((await c.next((m) => m.t === 's')).s.p.length === 1);
+  c.send({ t: 'in', dx: 1, dy: 0 }); await new Promise((r) => setTimeout(r, 300));
+  c.send({ t: 'leave' });
+  const end = await c.next((m) => m.t === 'end'); assert.equal(end.over.cleared, false); assert.ok(end.reward);
+  c.ws.close();
 });
 
 test('co-op: one connection per account, malformed websocket frames, flood', async () => {

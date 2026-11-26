@@ -5,9 +5,8 @@ import { readFileSync, statSync } from 'node:fs';
 import { join, normalize, extname, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
-import { CLASS, DUNGEON, BOSS_AT } from '../shared/data.js';
-import { validName, createChar, upgradeEquip, applyRun, unlocked } from '../shared/meta.js';
+import { CLASS } from '../shared/data.js';
+import { validName, createChar, upgradeEquip } from '../shared/meta.js';
 import { db, q, sha256, hashPassword, checkPassword, createUser, newSession, loadProfile, saveProfile, getChar, nameKey } from './db.js';
 import { upgrade } from './ws.js';
 import { connect, stats } from './rooms.js';
@@ -16,12 +15,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8080), HOST = process.env.HOST || '0.0.0.0';
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const CORS = new Set((process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean));
-const RUN_RATIO = Number(process.env.RUN_TIME_RATIO ?? 0.85);
-const TICKET_MAX_AGE = 3 * 3600e3;
 
-let SECRET = process.env.TICKET_SECRET || db.prepare("SELECT v FROM meta WHERE k = 'secret'").get()?.v;
-if (!SECRET) { SECRET = randomBytes(32).toString('base64url'); db.prepare("INSERT INTO meta (k, v) VALUES ('secret', ?)").run(SECRET); }
-const sign = (s) => createHmac('sha256', SECRET).update(s).digest('base64url').slice(0, 32);
 
 class HttpError extends Error { constructor(status, code) { super(code); this.status = status; this.code = code; } }
 
@@ -33,7 +27,6 @@ function clientIp(req) {
   if (ip.includes(':')) ip = ip.split(':').slice(0, 4).join(':') + '::/64';
   return ip;
 }
-const openTicket = new Map();   // user -> nonce of the only redeemable ticket (shortcut: in memory, a restart forgets it)
 const buckets = new Map();
 function limited(key, max, ms) {
   const now = Date.now(); let b = buckets.get(key);
@@ -41,7 +34,7 @@ function limited(key, max, ms) {
   if (!b || b.reset <= now) { b = { n: 0, reset: now + ms }; buckets.set(key, b); }
   return ++b.n > max;
 }
-setInterval(() => { const now = Date.now(); for (const [k, b] of buckets) if (b.reset <= now) buckets.delete(k); q.purge.run(now); q.purgeTickets.run(now); }, 60_000).unref();
+setInterval(() => { const now = Date.now(); for (const [k, b] of buckets) if (b.reset <= now) buckets.delete(k); q.purge.run(now); }, 60_000).unref();
 
 // ---------- auth ----------
 const DUMMY = await hashPassword('timing-equaliser');
@@ -100,38 +93,6 @@ const API = {
     const p = loadProfile(u.id), err = upgradeEquip(p, charId, slot);
     if (err) throw new HttpError(400, err);
     saveProfile(u.id, p); return { profile: p };
-  },
-  async 'POST run/start'(req) {
-    const u = need(req); const { charId, dungeon } = await readJson(req);
-    if (limited('run:' + u.id, 120, 3600e3)) throw new HttpError(429, 'rate');
-    const d = DUNGEON[dungeon], p = loadProfile(u.id);
-    if (!d || d.mode !== 'single' || !unlocked(p, d) || !getChar(charId, u.id)) throw new HttpError(400, 'bad');
-    const nonce = randomBytes(9).toString('base64url'), body = `${u.id}.${charId}.${dungeon}.${Date.now()}.${nonce}`;
-    if (openTicket.size > 20_000) openTicket.clear();
-    openTicket.set(u.id, nonce);
-    return { ticket: `${body}.${sign(body)}` };
-  },
-  async 'POST run/finish'(req) {
-    const u = need(req); const b = await readJson(req);
-    const parts = String(b.ticket || '').split('.');
-    if (parts.length !== 6) throw new HttpError(400, 'bad_ticket');
-    const body = parts.slice(0, 5).join('.'), want = Buffer.from(sign(body)), got = Buffer.from(parts[5]);
-    if (want.length !== got.length || !timingSafeEqual(want, got)) throw new HttpError(400, 'bad_ticket');
-    const [uid, charId, dun, issued, nonce] = parts, age = Date.now() - Number(issued);
-    if (Number(uid) !== u.id || !(age >= 0) || age > TICKET_MAX_AGE) throw new HttpError(400, 'bad_ticket');
-    const time = Number(b.time), kills = Number(b.kills), coins = Number(b.coins), cleared = b.cleared === true;
-    if (![time, kills, coins].every((n) => Number.isFinite(n) && n >= 0) || time > 960) throw new HttpError(400, 'bad');
-    // a run cannot be reported faster than it takes to play, nor with more kills than the engine can produce
-    if (time * 1000 * RUN_RATIO > age + 3000) throw new HttpError(400, 'too_fast');
-    if (kills > time * 12 + 50 || coins > kills * 0.25 + time * 0.25 + 30) throw new HttpError(400, 'implausible');
-    if (cleared && time < BOSS_AT - 10) throw new HttpError(400, 'implausible');
-    if (openTicket.has(u.id) && openTicket.get(u.id) !== nonce) throw new HttpError(400, 'bad_ticket');
-    if (q.ticketUsed.get(nonce)) throw new HttpError(409, 'ticket_used');
-    q.useTicket.run(nonce, Date.now() + TICKET_MAX_AGE * 2);
-    const p = loadProfile(u.id);
-    const rew = applyRun(p, Number(charId), { dungeonId: dun, kills: Math.floor(kills), coinsPicked: Math.floor(coins), timeSec: time, cleared });
-    if (!rew) throw new HttpError(400, 'bad');
-    saveProfile(u.id, p); return { reward: rew, profile: p };
   },
 };
 

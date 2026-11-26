@@ -17,7 +17,7 @@ struct Member {
     msgs: u32, tick: Instant, last_seen: Instant, born: Instant, misses: u8, ip: String,
 }
 struct Room {
-    code: String, owner_id: i64, owner_name: String, members: Vec<u64>, running: bool, dun: String, sim: Option<Sim>, evbuf: Vec<Ev>, last: Instant, acc: f64, gen: u64,
+    code: String, owner_id: i64, owner_name: String, members: Vec<u64>, running: bool, dun: String, sim: Option<Sim>, evbuf: Vec<Ev>, last: Instant, acc: f64, gen: u64, solo: bool,
 }
 #[derive(Default)]
 struct State { ip_miss: HashMap<String, (u32, Instant)>, rooms: HashMap<String, Room>, members: HashMap<u64, Member>, by_user: HashMap<i64, u64>, next_id: u64, next_gen: u64 }
@@ -81,6 +81,7 @@ impl Hub {
         match t {
             "ping" => { let n = num("n"); let n = if n.is_finite() && n != 0.0 { n } else { 0.0 }; if let Some(m) = s.members.get(&id) { send(m, json!({"t": "pong", "n": n})); } }
             "open" => self.open(&mut s, id),
+            "solo" => { let dun = d.get("dun").and_then(|v| v.as_str()).unwrap_or("").to_string(); self.solo(&mut s, id, &dun); }
             "join" => { let code: String = d.get("code").and_then(|v| v.as_str()).unwrap_or("").to_uppercase().chars().take(8).collect(); self.join(&mut s, id, &code); }
             "in" => {
                 if let (Some(code), Some(m)) = (room_code, s.members.get(&id)) {
@@ -148,9 +149,25 @@ impl Hub {
         let code = (0..200).map(|_| (0..3).map(|_| (b'A' + (rng.next_u32() % 12) as u8) as char).collect::<String>()).find(|c| !s.rooms.contains_key(c));
         let Some(code) = code else { return err(s, "full_world") };
         s.next_gen += 1; let gen = s.next_gen;
-        s.rooms.insert(code.clone(), Room { code: code.clone(), owner_id: uid, owner_name: name, members: vec![id], running: false, dun: "m1".into(), sim: None, evbuf: vec![], last: Instant::now(), acc: 0.0, gen });
+        s.rooms.insert(code.clone(), Room { code: code.clone(), owner_id: uid, owner_name: name, members: vec![id], running: false, dun: "m1".into(), sim: None, evbuf: vec![], last: Instant::now(), acc: 0.0, gen, solo: false });
         s.members.get_mut(&id).unwrap().room = Some(code.clone());
         self.broadcast(s, &code);
+    }
+
+    // A single-player run is a private one-player room: the server runs the sim, so coins/xp/progress cannot be faked.
+    fn solo(&self, s: &mut State, id: u64, dun: &str) {
+        let (has_room, user_id, char_id, name) = { let m = s.members.get(&id).unwrap(); (m.room.is_some(), m.user_id, m.ch.as_ref().map(|c| c.id).unwrap_or(0), m.name.clone()) };
+        if has_room { return; }
+        let err = |s: &State, c: &str| { if let Some(m) = s.members.get(&id) { send(m, json!({"t": "err", "code": c})); } };
+        let (Some(uid), true) = (user_id, char_id != 0) else { return err(s, "need_account") };
+        let Some(d) = crate::data::dungeon(dun) else { return err(s, "bad") };
+        let ok = d.mode == "single" && self.db.load_profile(uid).map(|p| crate::meta::unlocked(&p, d)).unwrap_or(false);
+        if !ok { return err(s, "bad"); }
+        s.next_gen += 1; let gen = s.next_gen;
+        let code = format!("~{id}");
+        s.rooms.insert(code.clone(), Room { code: code.clone(), owner_id: uid, owner_name: name, members: vec![id], running: false, dun: dun.to_string(), sim: None, evbuf: vec![], last: Instant::now(), acc: 0.0, gen, solo: true });
+        s.members.get_mut(&id).unwrap().room = Some(code.clone());
+        self.start_run(s, &code);
     }
 
     fn join(&self, s: &mut State, id: u64, code: &str) {
@@ -159,7 +176,7 @@ impl Hub {
         let err = |s: &State, c: &str| { if let Some(m) = s.members.get(&id) { send(m, json!({"t": "err", "code": c})); } };
         if !has_char { return err(s, "need_char"); }
         let blocked = s.ip_miss.get(&ip).map(|(n, t)| *n >= 20 && t.elapsed().as_secs() < 600).unwrap_or(false);
-        if blocked || !s.rooms.contains_key(code) {
+        if blocked || !s.rooms.get(code).map(|r| !r.solo).unwrap_or(false) {
             if let Some(m) = s.members.get_mut(&id) { m.misses += 1; if m.misses >= 5 { let _ = m.tx.try_send(Out::Close(1008)); } }
             let e = s.ip_miss.entry(ip).or_insert((0, Instant::now()));
             if e.1.elapsed().as_secs() >= 600 { *e = (0, Instant::now()); }
@@ -177,6 +194,10 @@ impl Hub {
     fn leave_locked(&self, s: &mut State, id: u64) {
         let Some(code) = s.members.get(&id).and_then(|m| m.room.clone()) else { return };
         let pid = { let m = s.members.get_mut(&id).unwrap(); m.room = None; m.left = true; m.pid };
+        if s.rooms.get(&code).map(|r| r.solo).unwrap_or(false) {   // quitting or dropping pays out what was earned so far
+            if let Some(sim) = s.rooms.get_mut(&code).and_then(|r| r.sim.as_mut()) { if sim.over.is_none() { sim.finish_now(); self.end_run(s, &code); } }
+            s.rooms.remove(&code); return;
+        }
         let Some(room) = s.rooms.get_mut(&code) else { return };
         room.members.retain(|m| *m != id);
         if let (Some(sim), true) = (room.sim.as_mut(), pid != 0) { sim.kill_player(pid); }
@@ -246,7 +267,7 @@ impl Hub {
                 if c.id != 0 {
                     if let Some(mut prof) = self.db.load_profile(uid) {
                         let before = prof.chars.iter().find(|q| q.id == c.id).map(|q| q.level as i64).unwrap_or(1);
-                        if let Some(rw) = apply_run(&mut prof, c.id, &RunResult { dungeon_id: &dun, kills: r.kills as f64, coins_picked: r.coins, time_sec: over.time, cleared: over.cleared, reward_mul: r.reward }) {
+                        if let Some(rw) = apply_run(&mut prof, c.id, &RunResult { dungeon_id: &dun, kills: r.kills as f64, coins_picked: r.coins, time_sec: over.time, cleared: over.cleared && r.kills > 0, reward_mul: r.reward }) {   /* an idle alt (0 kills) gets no clear bonus */
                             reward = json!({"xp": rw.xp, "coins": rw.coins});
                             if self.db.save_profile(uid, &prof).is_ok() {
                                 level = prof.chars.iter().find(|q| q.id == c.id).map(|q| q.level as i64).unwrap_or(before);
@@ -262,6 +283,7 @@ impl Hub {
             m.pid = 0;
         }
         let _ = dungeon(&dun);
+        if s.rooms.get(code).map(|r| r.solo).unwrap_or(false) { s.rooms.remove(code); return; }
         s.rooms.get_mut(code).unwrap().running = false;
         self.broadcast(s, code);
     }

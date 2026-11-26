@@ -1,5 +1,5 @@
 // Deterministic game simulation (port of shared/sim.js). One Sim = one run with 1..6 players, stepped at 20 Hz.
-use crate::data::{self, class, data, dungeon, or1, weapon_idx, Class, Dungeon};
+use crate::data::{class, data, dungeon, or1, weapon_idx, Class, Dungeon};
 use crate::meta::{char_stats, js_round, power, Char, Stats};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -379,6 +379,7 @@ impl Sim {
         if self.over.is_none() && t >= HARD_END { self.finish(false); }
     }
 
+    pub fn finish_now(&mut self) { self.finish(false); }
     fn finish(&mut self, cleared: bool) {
         self.over = Some(Over { cleared, time: self.now(), players: self.players.iter().map(|p| OverPlayer { kills: p.kills, coins: p.coins, reward: p.reward }).collect() });
     }

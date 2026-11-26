@@ -54,19 +54,11 @@ export const profile = {
     if (this.isGuest) { const err = upgradeEquip(this.p, charId, slot); if (err) throw new Error(err); store.save(); return; }
     this.p = (await call('POST', 'upgrade', { charId, slot })).profile;
   },
-  async runStart(charId, dungeon) {
-    if (this.isGuest) return { ticket: null };
-    return call('POST', 'run/start', { charId, dungeon });
-  },
-  async runFinish(ticket, charId, r) {
+  // guests only: their progress lives in this browser. Signed-in runs are simulated and paid out by the server.
+  runFinishLocal(charId, r) {
     const before = this.p.chars.find((c) => c.id === charId)?.level || 1;
-    if (this.isGuest) {
-      const rew = applyRun(this.p, charId, r); store.save();
-      return { reward: rew, levelUp: this.p.chars.find((c) => c.id === charId).level - before };
-    }
-    const j = await call('POST', 'run/finish', { ticket, kills: r.kills, coins: r.coinsPicked, time: r.timeSec, cleared: r.cleared });
-    this.p = j.profile;
-    return { reward: j.reward, levelUp: (this.p.chars.find((c) => c.id === charId)?.level || before) - before };
+    const rew = applyRun(this.p, charId, r); store.save();
+    return { reward: rew, levelUp: this.p.chars.find((c) => c.id === charId).level - before };
   },
 };
 
@@ -79,7 +71,7 @@ export class Net {
     else { url.searchParams.set('nick', opts.nick); url.searchParams.set('cls', opts.cls); }
     if (opts.char) url.searchParams.set('char', opts.char);
     this.ws = new WebSocket(url);
-    this.ws.onopen = () => { this.open = true; this.send(opts.code ? { t: 'join', code: opts.code } : { t: 'open' }); this.ping(); };
+    this.ws.onopen = () => { this.open = true; this.send(opts.solo ? { t: 'solo', dun: opts.solo } : opts.code ? { t: 'join', code: opts.code } : { t: 'open' }); this.ping(); };
     this.ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.t === 'pong') { this.rtt = this.rtt * 0.7 + (performance.now() - m.n) * 0.3; return; }

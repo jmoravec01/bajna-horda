@@ -17,7 +17,7 @@ use db::Db;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use futures_util::{SinkExt, StreamExt};
-use meta::{apply_run, create_char, unlocked, upgrade_equip, valid_name, Profile, RunResult};
+use meta::{create_char, upgrade_equip, valid_name, Profile};
 use rooms::{Hub, Out, Who};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -28,13 +28,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 const CSP: &str = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ws: wss:; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
-const TICKET_MAX_AGE: i64 = 3 * 3600 * 1000;
 
 struct App {
-    db: Arc<Db>, hub: Hub, secret: String, cors: HashSet<String>, trust_proxy: bool, reg_per_hour: u32, run_ratio: f64,
+    db: Arc<Db>, hub: Hub, cors: HashSet<String>, trust_proxy: bool, reg_per_hour: u32,
     public: PathBuf, shared: PathBuf, dummy: String,
     buckets: Mutex<HashMap<String, (u32, Instant)>>,
-    open_ticket: Mutex<HashMap<i64, String>>,   // user -> nonce of the only ticket that may be redeemed (shortcut: in memory, a restart forgets it)
     cache: Mutex<HashMap<PathBuf, (String, Arc<Vec<u8>>, Option<Arc<Vec<u8>>>)>>,
 }
 
@@ -52,7 +50,6 @@ pub fn js_number(v: &Value) -> f64 {
     }
 }
 fn is_integer(v: &Value) -> Option<i64> { match v { Value::Number(n) => { let f = n.as_f64()?; if f.is_finite() && f.fract() == 0.0 && f.abs() < 9e15 { Some(f as i64) } else { None } } _ => None } }
-fn now_ms() -> i64 { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64 }
 
 impl App {
     fn client_ip(&self, addr: &SocketAddr, headers: &HeaderMap) -> String {
@@ -96,7 +93,6 @@ impl App {
         let token = self.db.new_session(id);
         Ok(json!({"token": token, "user": u.name, "room": u.room, "profile": Self::profile_json(&self.profile(id)?)}))
     }
-    fn sign(&self, body: &str) -> String { db::sign(&self.secret, body) }
 }
 
 async fn read_json(body: Body) -> Result<Map<String, Value>, ApiErr> {
@@ -158,45 +154,6 @@ async fn api(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap, a
             if let Some(err) = upgrade_equip(&mut p, cid, slot) { return Err(ApiErr(400, err)); }
             app.db.save_profile(u.id, &p).map_err(|_| ApiErr(500, "server"))?;
             Ok(json!({"profile": App::profile_json(&p)}))
-        }
-        ("POST", "run/start") => {
-            let u = app.need(headers)?; let b = read_json(body).await?;
-            if app.limited(format!("run:{}", u.id), 120, 3600_000) { return Err(ApiErr(429, "rate")); }
-            let dun = b.get("dungeon").and_then(|v| v.as_str()).unwrap_or("");
-            let cid = b.get("charId").and_then(is_integer).unwrap_or(i64::MIN);
-            let p = app.profile(u.id)?;
-            let Some(d) = data::dungeon(dun) else { return Err(ApiErr(400, "bad")) };
-            if d.mode != "single" || !unlocked(&p, d) || app.db.get_char(cid, u.id).is_none() { return Err(ApiErr(400, "bad")); }
-            let nonce = db::random_token(9);
-            let body = format!("{}.{}.{}.{}.{}", u.id, cid, dun, now_ms(), nonce);
-            { let mut ot = app.open_ticket.lock().unwrap_or_else(|e| e.into_inner()); if ot.len() > 20_000 { ot.clear(); } ot.insert(u.id, nonce); }
-            Ok(json!({"ticket": format!("{}.{}", body, app.sign(&body))}))
-        }
-        ("POST", "run/finish") => {
-            let u = app.need(headers)?; let b = read_json(body).await?;
-            let ticket = match b.get("ticket") { Some(Value::String(s)) => s.clone(), _ => String::new() };
-            let parts: Vec<&str> = ticket.split('.').collect();
-            if parts.len() != 6 { return Err(ApiErr(400, "bad_ticket")); }
-            let tbody = parts[..5].join(".");
-            if !db::ct_eq(app.sign(&tbody).as_bytes(), parts[5].as_bytes()) { return Err(ApiErr(400, "bad_ticket")); }
-            let (uid, char_id, dun, issued, nonce) = (parts[0], parts[1], parts[2], parts[3], parts[4]);
-            let age = now_ms() - issued.parse::<i64>().unwrap_or(i64::MIN / 2);
-            if uid.parse::<i64>().ok() != Some(u.id) || age < 0 || age > TICKET_MAX_AGE { return Err(ApiErr(400, "bad_ticket")); }
-            let num = |k: &str| b.get(k).map(js_number).unwrap_or(f64::NAN);
-            let (time, kills, coins) = (num("time"), num("kills"), num("coins"));
-            let cleared = b.get("cleared") == Some(&Value::Bool(true));
-            if ![time, kills, coins].iter().all(|n| n.is_finite() && *n >= 0.0) || time > 960.0 { return Err(ApiErr(400, "bad")); }
-            if time * 1000.0 * app.run_ratio > age as f64 + 3000.0 { return Err(ApiErr(400, "too_fast")); }
-            if kills > time * 12.0 + 50.0 || coins > kills * 0.25 + time * 0.25 + 30.0 { return Err(ApiErr(400, "implausible")); }
-            if cleared && time < data::data().consts.boss_at - 10.0 { return Err(ApiErr(400, "implausible")); }
-            if let Some(n) = app.open_ticket.lock().unwrap_or_else(|e| e.into_inner()).get(&u.id) { if n != nonce { return Err(ApiErr(400, "bad_ticket")); } }
-            if app.db.ticket_used(nonce) { return Err(ApiErr(409, "ticket_used")); }
-            app.db.use_ticket(nonce, now_ms() + TICKET_MAX_AGE * 2);
-            let mut p = app.profile(u.id)?;
-            let rew = apply_run(&mut p, char_id.parse::<i64>().unwrap_or(i64::MIN), &RunResult { dungeon_id: dun, kills: kills.floor(), coins_picked: coins.floor(), time_sec: time, cleared, reward_mul: 1.0 });
-            let Some(rew) = rew else { return Err(ApiErr(400, "bad")) };
-            app.db.save_profile(u.id, &p).map_err(|_| ApiErr(500, "server"))?;
-            Ok(json!({"reward": {"xp": rew.xp, "coins": rew.coins}, "profile": App::profile_json(&p)}))
         }
         _ => Err(ApiErr(404, "not_found")),
     }
@@ -345,11 +302,11 @@ async fn main() {
     let root = PathBuf::from(env("APP_ROOT", "."));
     data::data();                                      // fail at start-up, not mid-game, if data.json is broken
     let app = Arc::new(App {
-        hub: Hub::new(db.clone()), secret: db.secret(std::env::var("TICKET_SECRET").ok()), db: db.clone(),
+        hub: Hub::new(db.clone()), db: db.clone(),
         cors: env("CORS_ORIGINS", "").split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
-        trust_proxy: env("TRUST_PROXY", "0") == "1", reg_per_hour: env("REG_PER_HOUR", "8").parse().unwrap_or(8), run_ratio: env("RUN_TIME_RATIO", "0.85").parse().unwrap_or(0.85),
+        trust_proxy: env("TRUST_PROXY", "0") == "1", reg_per_hour: env("REG_PER_HOUR", "8").parse().unwrap_or(8),
         public: root.join("public"), shared: root.join("shared"), dummy: db::hash_password("timing-equaliser"),
-        buckets: Mutex::new(HashMap::new()), open_ticket: Mutex::new(HashMap::new()), cache: Mutex::new(HashMap::new()),
+        buckets: Mutex::new(HashMap::new()), cache: Mutex::new(HashMap::new()),
     });
     let bg = app.clone();
     tokio::spawn(async move {

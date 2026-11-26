@@ -115,8 +115,8 @@ const SCREENS = {
       const open = unlocked(profile.p, d);
       return `<button class="dun ${open ? '' : 'lock'}" data-d="${d.id}" ${open ? '' : 'disabled'}><b>${esc(nm(d))}</b><small>${open ? `${t('recommended')}: ${REC[d.id]}` : t('locked')}</small><span class="bg bg-${d.deco}"></span></button>`;
     }).join('');
-    view(`<div class="screen single">${topbar('home')}<h2>${t('single')}: ${t('dungeons')}</h2>${charCard(c, true)}<div class="duns">${cards}</div></div>`, (root) => wire(root, (e) => {
-      const d = e.target.closest('[data-d]'); if (d) startSingle(d.dataset.d);
+    view(`<div class="screen single">${topbar('home')}<h2>${t('single')}: ${t('dungeons')}</h2>${charCard(c, true)}<div class="duns">${cards}</div><p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
+      const d = e.target.closest('[data-d]'); if (d) { S.msg = ''; startSingle(d.dataset.d); }
     }));
   },
 
@@ -140,7 +140,10 @@ const SCREENS = {
     }));
   },
 
-  connecting() { view(`<div class="screen center"><p class="sub">${t('connecting')}</p><button class="btn ghost" data-go="multi">${t('back')}</button></div>`, (r) => wire(r, () => { S.net?.close(); })); },
+  connecting() { view(`<div class="screen center"><p class="sub">${t('connecting')}</p><button class="btn ghost" data-act="cancel">${t('back')}</button></div>`, (r) => wire(r, (e) => {
+    if (!e.target.closest('[data-act=cancel]')) return;   // the root keeps this handler once the run replaces the screen: ignore every other click
+    const solo = S.solo, n = S.net; S.net = null; S.solo = false; n?.close(); go(solo ? 'single' : 'multi');
+  })); },
 
   lobby() {
     S.args = []; const r = S.room, me = r.members.find((m) => m.id === r.you), host = r.hostId === r.you, c = activeChar();
@@ -192,24 +195,32 @@ async function afterLogin() {
 }
 
 async function startSingle(dunId) {
-  const c = activeChar(); let tk;
-  try { tk = await profile.runStart(c.id, dunId); } catch (e) { return note(errText(e)); }
-  const d = DUNGEON[dunId];
-  S.run = new Run({ root: $app, mode: 'single', dun: dunId, players: [{ id: 1, name: c.name, cls: c.cls }], meId: 1, char: { ...c }, onEnd: async (over, st) => {
+  const c = activeChar();
+  if (!profile.isGuest && !OFFLINE) return startSolo(dunId);
+  // guest / offline: the run is simulated here and the result stays in this browser
+  S.run = new Run({ root: $app, mode: 'single', dun: dunId, players: [{ id: 1, name: c.name, cls: c.cls }], meId: 1, char: { ...c }, onEnd: (over, st) => {
     S.run = null;
-    try {
-      const j = await profile.runFinish(tk.ticket, c.id, { dungeonId: dunId, kills: st.kills, coinsPicked: st.coinsPicked, timeSec: st.timeSec, cleared: st.cleared });
-      const now = activeChar();
-      go('result', { cleared: st.cleared, time: st.timeSec, kills: st.kills, reward: j.reward, levelUp: j.levelUp, level: now.level });
-    } catch (e) { go('result', { cleared: false, time: st.timeSec, kills: st.kills, reward: {}, levelUp: 0 }); }
+    const j = profile.runFinishLocal(c.id, { dungeonId: dunId, kills: st.kills, coinsPicked: st.coinsPicked, timeSec: st.timeSec, cleared: st.cleared });
+    go('result', { cleared: st.cleared, time: st.timeSec, kills: st.kills, reward: j.reward, levelUp: j.levelUp, level: activeChar().level });
   } });
   S.run.start();
+}
+
+// signed-in single player: a private one-player room on the server, which runs the sim and pays out (nothing the client reports counts)
+function startSolo(dunId) {
+  const c = activeChar();
+  leaveRoom(true); S.solo = true; go('connecting');
+  S.net = new Net({
+    msg: onNet,
+    close: () => { if (S.run) { S.run.destroy(); S.run = null; } if (S.net) { S.net = null; S.solo = false; S.msg = t('lost'); go('single'); } },
+  });
+  S.net.connect({ solo: dunId, char: c.id, nick: c.name, cls: c.cls });
 }
 
 function joinRoom(code) {
   const c = activeChar();
   if (!c) return go('create');
-  leaveRoom(true);
+  leaveRoom(true); S.solo = false;
   go('connecting');
   S.net = new Net({
     msg: onNet,
@@ -227,16 +238,17 @@ function leaveRoom(quiet) {
 function onNet(m) {
   switch (m.t) {
     case 'room': S.room = m; if (!S.run && S.screen !== 'result') go('lobby'); break;
-    case 'err': { const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char', need_account: 'need_account', full_world: 'full_world' }[m.code]; S.msg = t(k || 'err_x'); leaveRoom(true); go('multi'); break; }
+    case 'err': { const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char', need_account: 'need_account', full_world: 'full_world' }[m.code]; S.msg = t(k || 'err_x'); const solo = S.solo; S.solo = false; leaveRoom(true); go(solo ? 'single' : 'multi'); break; }
     case 'start': {
       const c = activeChar();
-      S.run = new Run({ root: $app, mode: 'multi', dun: m.dun, players: m.players, meId: m.you, net: S.net, onEnd: () => leaveRoom() });
+      S.run = new Run({ root: $app, mode: 'multi', dun: m.dun, players: m.players, meId: m.you, net: S.net, onEnd: () => (S.solo ? S.net?.send({ t: 'leave' }) : leaveRoom()) });   // solo: the server answers a leave with the result
       S.run.start(); break;
     }
     case 's': S.run?.push(m.s, performance.now()); break;
     case 'end': {
       const run = S.run; S.run = null; run?.destroy();
-      profile.load().catch(() => {}).finally(() => go('result', { multi: true, cleared: m.over.cleared, time: m.over.time, kills: m.kills, reward: m.reward, levelUp: m.levelUp || 0, level: m.level, carry: m.carry }));
+      const solo = S.solo; if (solo) { const n = S.net; S.net = null; S.solo = false; n?.close(); }
+      profile.load().catch(() => {}).finally(() => go('result', { multi: !solo, cleared: m.over.cleared, time: m.over.time, kills: m.kills, reward: m.reward, levelUp: m.levelUp || 0, level: m.level, carry: m.carry }));
       break;
     }
   }
