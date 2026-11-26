@@ -83,6 +83,7 @@ const HERO = {
   baba: { hat: [[3, 1, 6, 2, '#bbb'], [2, 3, 1, 3, '#bbb'], [9, 3, 1, 3, '#bbb']], extra: [[6, 5, 2, 1, '#b08060'], [10, 2, 1, 12, '#8a5a2a'], [9, 13, 3, 2, '#c9a05a']] },
 };
 const shade = (hex, k) => '#' + [1, 3, 5].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
+export const heroSkin = (cls) => HERO[cls].skin || SKIN;
 const heroCache = new Map();
 export function heroSprite(cls, frame) {
   const key = cls + frame;

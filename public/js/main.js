@@ -102,7 +102,7 @@ const SCREENS = {
       const tile = e.target.closest('[data-cls]'); if (tile) { S.pick = tile.dataset.cls; sfx('click'); return SCREENS.create(); }
       if (e.target.closest('[data-act=make]')) {
         if (!validName(S.cname)) return note(t('err_name'));
-        try { await profile.create(S.cname.trim(), S.pick); const ch = profile.p.chars[profile.p.chars.length - 1]; store.d.active = ch.id; store.save(); S.cname = ''; go('chars'); } catch (er) { note(errText(er)); }
+        try { await profile.create(S.cname.trim(), S.pick); const ch = profile.p.chars[profile.p.chars.length - 1]; store.d.active = ch.id; store.save(); S.cname = ''; const h = location.hash.match(/^#\/room\/([A-Za-z0-9]+)/); if (h && !OFFLINE) joinRoom(h[1].toUpperCase()); else go('chars'); } catch (er) { note(errText(er)); }
       }
     }));
   },
@@ -215,7 +215,7 @@ function leaveRoom(quiet) {
 
 function onNet(m) {
   switch (m.t) {
-    case 'room': S.room = m; if (!S.run) go('lobby'); break;
+    case 'room': S.room = m; if (!S.run && S.screen !== 'result') go('lobby'); break;
     case 'err': { const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char' }[m.code]; S.msg = t(k || 'err_x'); leaveRoom(true); go('multi'); break; }
     case 'start': {
       const c = activeChar();

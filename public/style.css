@@ -48,7 +48,7 @@ input, select { font: inherit; font-size: 16px; color: var(--text); background: 
 
 /* dungeons + lobby */
 .duns { display: flex; flex-direction: column; gap: 8px; } .duns.row3 { flex-direction: row; }
-.dun { position: relative; overflow: hidden; background: var(--panel); color: var(--text); font: inherit; border: 0; text-align: left; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; box-shadow: 0 -3px 0 var(--edge), 0 3px 0 var(--edge), -3px 0 0 var(--edge), 3px 0 0 var(--edge); flex: 1; }
+.dun { position: relative; overflow: hidden; background: var(--panel); color: var(--text); font: inherit; border: 0; text-align: left; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; box-shadow: 0 -3px 0 var(--edge), 0 3px 0 var(--edge), -3px 0 0 var(--edge), 3px 0 0 var(--edge); flex: 1; flex-shrink: 0; }
 .dun b { font-size: 19px; position: relative; z-index: 1; } .dun small { position: relative; z-index: 1; } .dun.lock { opacity: .45; } .dun.sel { box-shadow: 0 -3px 0 var(--gold), 0 3px 0 var(--gold), -3px 0 0 var(--gold), 3px 0 0 var(--gold); } .dun.mini { padding: 10px 8px; align-items: center; } .dun.mini b { font-size: 15px; }
 .dun .bg { position: absolute; inset: 0; opacity: .25; } .bg-grass { background: #3d7a3a; } .bg-bones { background: #3a3548; } .bg-lava { background: #b03a1a; } .bg-rocks { background: #4a4038; } .bg-reeds { background: #3a4a2e; } .bg-ice { background: #8ab8d0; }
 .code { font-size: 34px; letter-spacing: 6px; text-align: center; color: var(--gold); margin: 6px 0; }

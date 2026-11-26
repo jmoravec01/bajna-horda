@@ -43,7 +43,7 @@ export async function checkPassword(pw, stored) {
   return timingSafeEqual(want, got);
 }
 
-const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ALPHA = 'ABCDEFGHJKLMNPQRTUVWXYZ234789';
 const roomCode = () => Array.from({ length: 5 }, () => ALPHA[randomInt(ALPHA.length)]).join('');
 
 export const q = {

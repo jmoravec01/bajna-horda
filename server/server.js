@@ -33,10 +33,11 @@ function clientIp(req) {
   if (ip.includes(':')) ip = ip.split(':').slice(0, 4).join(':') + '::/64';
   return ip;
 }
+const openTicket = new Map();   // user -> nonce of the only redeemable ticket (shortcut: in memory, a restart forgets it)
 const buckets = new Map();
 function limited(key, max, ms) {
   const now = Date.now(); let b = buckets.get(key);
-  if (!b && buckets.size >= 50_000) return true;
+  if (!b && buckets.size >= 50_000) { for (const [k, v] of buckets) if (v.reset <= now) buckets.delete(k); if (buckets.size >= 50_000) return true; }
   if (!b || b.reset <= now) { b = { n: 0, reset: now + ms }; buckets.set(key, b); }
   return ++b.n > max;
 }
@@ -105,7 +106,9 @@ const API = {
     if (limited('run:' + u.id, 120, 3600e3)) throw new HttpError(429, 'rate');
     const d = DUNGEON[dungeon], p = loadProfile(u.id);
     if (!d || d.mode !== 'single' || !unlocked(p, d) || !getChar(charId, u.id)) throw new HttpError(400, 'bad');
-    const body = `${u.id}.${charId}.${dungeon}.${Date.now()}.${randomBytes(9).toString('base64url')}`;
+    const nonce = randomBytes(9).toString('base64url'), body = `${u.id}.${charId}.${dungeon}.${Date.now()}.${nonce}`;
+    if (openTicket.size > 20_000) openTicket.clear();
+    openTicket.set(u.id, nonce);
     return { ticket: `${body}.${sign(body)}` };
   },
   async 'POST run/finish'(req) {
@@ -120,8 +123,9 @@ const API = {
     if (![time, kills, coins].every((n) => Number.isFinite(n) && n >= 0) || time > 960) throw new HttpError(400, 'bad');
     // a run cannot be reported faster than it takes to play, nor with more kills than the engine can produce
     if (time * 1000 * RUN_RATIO > age + 3000) throw new HttpError(400, 'too_fast');
-    if (kills > time * 16 + 50 || coins > kills * 0.5 + time * 0.5 + 60) throw new HttpError(400, 'implausible');
+    if (kills > time * 12 + 50 || coins > kills * 0.25 + time * 0.25 + 30) throw new HttpError(400, 'implausible');
     if (cleared && time < BOSS_AT - 10) throw new HttpError(400, 'implausible');
+    if (openTicket.has(u.id) && openTicket.get(u.id) !== nonce) throw new HttpError(400, 'bad_ticket');
     if (q.ticketUsed.get(nonce)) throw new HttpError(409, 'ticket_used');
     q.useTicket.run(nonce, Date.now() + TICKET_MAX_AGE * 2);
     const p = loadProfile(u.id);

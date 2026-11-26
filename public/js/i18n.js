@@ -3,7 +3,7 @@ const D = {
   cs: {
     sub: 'Pixelová horda do kapsy', login: 'Přihlásit', register: 'Registrovat', guest: 'Hrát jako host', nick: 'Přezdívka', pass: 'Heslo (min. 6 znaků)', logout: 'Odhlásit',
     guest_note: 'Host: postup se ukládá jen v tomhle prohlížeči.', offline_note: 'Offline verze: postup se ukládá jen v tomhle prohlížeči, bez multiplayeru.',
-    single: 'Single', multi: 'Multiplayer', chars: 'Postavy', coins: 'Mince', level: 'Lv', power: 'Síla', back: 'Zpět', ok: 'OK', menu: 'Menu',
+    single: 'Sám', multi: 'Multiplayer', chars: 'Postavy', coins: 'Mince', level: 'Lv', power: 'Síla', back: 'Zpět', ok: 'OK', menu: 'Menu',
     newchar: 'Nová postava', create: 'Vytvořit', del: 'Smazat', confirm_del: 'Smazat postavu? Nejde to vrátit.', name: 'Jméno postavy', pick_class: 'Vyber třídu', active: 'Aktivní', select: 'Vybrat',
     weapon: 'Zbraň', armor: 'Brnění', ring: 'Prsten', boots: 'Boty', upgrade: 'Vylepšit', maxed: 'Max', weapon_d: '+4 % poškození', armor_d: '+5 % HP', ring_d: '+2 % poškození, větší sběr', boots_d: '+1,5 % rychlost, kratší čekání',
     chars_full: 'Máš plný počet postav (8).', no_char: 'Nejdřív vytvoř postavu.', slots: 'Postavy',

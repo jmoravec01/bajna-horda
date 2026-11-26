@@ -34,6 +34,7 @@ struct App {
     db: Arc<Db>, hub: Hub, secret: String, cors: HashSet<String>, trust_proxy: bool, reg_per_hour: u32, run_ratio: f64,
     public: PathBuf, shared: PathBuf, dummy: String,
     buckets: Mutex<HashMap<String, (u32, Instant)>>,
+    open_ticket: Mutex<HashMap<i64, String>>,   // user -> nonce of the only ticket that may be redeemed (shortcut: in memory, a restart forgets it)
     cache: Mutex<HashMap<PathBuf, (String, Arc<Vec<u8>>, Option<Arc<Vec<u8>>>)>>,
 }
 
@@ -69,7 +70,10 @@ impl App {
     fn limited(&self, key: String, max: u32, ms: u64) -> bool {
         let mut b = self.buckets.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
-        if !b.contains_key(&key) && b.len() >= 50_000 { return true; }
+        if !b.contains_key(&key) && b.len() >= 50_000 {
+            let now = Instant::now(); b.retain(|_, v| v.1 > now);   // drop expired buckets instead of locking everyone out
+            if b.len() >= 50_000 { return true; }
+        }
         let e = b.entry(key).or_insert((0, now + Duration::from_millis(ms)));
         if e.1 <= now { *e = (0, now + Duration::from_millis(ms)); }
         e.0 += 1;
@@ -163,7 +167,9 @@ async fn api(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap, a
             let p = app.profile(u.id)?;
             let Some(d) = data::dungeon(dun) else { return Err(ApiErr(400, "bad")) };
             if d.mode != "single" || !unlocked(&p, d) || app.db.get_char(cid, u.id).is_none() { return Err(ApiErr(400, "bad")); }
-            let body = format!("{}.{}.{}.{}.{}", u.id, cid, dun, now_ms(), db::random_token(9));
+            let nonce = db::random_token(9);
+            let body = format!("{}.{}.{}.{}.{}", u.id, cid, dun, now_ms(), nonce);
+            { let mut ot = app.open_ticket.lock().unwrap_or_else(|e| e.into_inner()); if ot.len() > 20_000 { ot.clear(); } ot.insert(u.id, nonce); }
             Ok(json!({"ticket": format!("{}.{}", body, app.sign(&body))}))
         }
         ("POST", "run/finish") => {
@@ -181,8 +187,9 @@ async fn api(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap, a
             let cleared = b.get("cleared") == Some(&Value::Bool(true));
             if ![time, kills, coins].iter().all(|n| n.is_finite() && *n >= 0.0) || time > 960.0 { return Err(ApiErr(400, "bad")); }
             if time * 1000.0 * app.run_ratio > age as f64 + 3000.0 { return Err(ApiErr(400, "too_fast")); }
-            if kills > time * 16.0 + 50.0 || coins > kills * 0.5 + time * 0.5 + 60.0 { return Err(ApiErr(400, "implausible")); }
+            if kills > time * 12.0 + 50.0 || coins > kills * 0.25 + time * 0.25 + 30.0 { return Err(ApiErr(400, "implausible")); }
             if cleared && time < data::data().consts.boss_at - 10.0 { return Err(ApiErr(400, "implausible")); }
+            if let Some(n) = app.open_ticket.lock().unwrap_or_else(|e| e.into_inner()).get(&u.id) { if n != nonce { return Err(ApiErr(400, "bad_ticket")); } }
             if app.db.ticket_used(nonce) { return Err(ApiErr(409, "ticket_used")); }
             app.db.use_ticket(nonce, now_ms() + TICKET_MAX_AGE * 2);
             let mut p = app.profile(u.id)?;
@@ -341,7 +348,7 @@ async fn main() {
         cors: env("CORS_ORIGINS", "").split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
         trust_proxy: env("TRUST_PROXY", "0") == "1", reg_per_hour: env("REG_PER_HOUR", "8").parse().unwrap_or(8), run_ratio: env("RUN_TIME_RATIO", "0.85").parse().unwrap_or(0.85),
         public: root.join("public"), shared: root.join("shared"), dummy: db::hash_password("timing-equaliser"),
-        buckets: Mutex::new(HashMap::new()), cache: Mutex::new(HashMap::new()),
+        buckets: Mutex::new(HashMap::new()), open_ticket: Mutex::new(HashMap::new()), cache: Mutex::new(HashMap::new()),
     });
     let bg = app.clone();
     tokio::spawn(async move {

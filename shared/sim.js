@@ -383,11 +383,14 @@ export class Sim {
           w.cd = cd; break;
         }
       }
+      if (w.cd > 0) this.emit('a', r1(p.x), r1(p.y), p.id, wix);   // the weapon fired: the client animates the swing/throw/cast
     }
   }
 
   orbit(p, w, st, wi, wix, dmg, T) {
+    const rev0 = Math.floor(w.ang / 6.2832);
     w.ang += st.speed * DT;
+    if (Math.floor(w.ang / 6.2832) !== rev0) this.emit('a', r1(p.x), r1(p.y), p.id, wix);   // once per revolution
     const R = 26 + st.area * 0.3;
     for (let i = 0; i < st.count; i++) {
       const a = w.ang + i / st.count * 6.283, bx = p.x + Math.cos(a) * R, by = p.y + Math.sin(a) * R;

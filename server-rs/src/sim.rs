@@ -93,7 +93,7 @@ struct Pick { id: i64, tier: u8, x: f64, y: f64, v: f64, mag: bool }
 
 #[derive(Clone)]
 pub enum Ev {
-    Hit(f64, f64), Crit(f64, f64), Die(f64, f64, u8), Ring(f64, f64, f64, usize), Boom(f64, f64, f64), Chain(Vec<f64>), BossWarn,
+    Hit(f64, f64), Crit(f64, f64), Die(f64, f64, u8), Ring(f64, f64, f64, usize), Boom(f64, f64, f64), Chain(Vec<f64>), BossWarn, Atk(f64, f64, u32, usize),
     Personal(char, u32),   // L u x g $ + M C m v: only the owner needs these
 }
 
@@ -653,12 +653,15 @@ impl Sim {
                 }
                 _ => {}
             }
+            if self.players[pi].weapons[wi].cd > 0.0 { let id = self.players[pi].id; self.emit(Ev::Atk(r1(px), r1(py), id, wix)); }
         }
     }
 
     fn orbit(&mut self, pi: usize, wi: usize, st: &WStats, wix: usize, dmg: f64, t: f64) {
         let dt = data().consts.dt;
+        let rev0 = (self.players[pi].weapons[wi].ang / 6.2832).floor();
         self.players[pi].weapons[wi].ang += st.speed * dt;
+        if (self.players[pi].weapons[wi].ang / 6.2832).floor() != rev0 { let (x, y, id) = (r1(self.players[pi].x), r1(self.players[pi].y), self.players[pi].id); self.emit(Ev::Atk(x, y, id, wix)); }
         let ang = self.players[pi].weapons[wi].ang;
         let r = 26.0 + st.area * 0.3;
         let (px, py, pid) = (self.players[pi].x, self.players[pi].y, self.players[pi].id as i64);
@@ -881,6 +884,7 @@ impl Sim {
                 Ev::Crit(x, y) => { if near(*x, *y) { v.push(json!(["k", x, y])); } }
                 Ev::Die(x, y, b) => { if near(*x, *y) { v.push(json!(["d", x, y, b])); } }
                 Ev::Ring(x, y, r, w) => { if near(*x, *y) { v.push(json!(["r", x, y, r, w])); } }
+                Ev::Atk(x, y, id, w) => { if near(*x, *y) { v.push(json!(["a", x, y, id, w])); } }
                 Ev::Boom(x, y, r) => { if near(*x, *y) { v.push(json!(["b", x, y, r])); } }
             }
         }

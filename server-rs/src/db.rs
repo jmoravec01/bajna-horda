@@ -30,7 +30,7 @@ pub fn name_key(n: &str) -> String {
     s.replace_all(&t, " ").into_owned()
 }
 
-const ALPHA: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const ALPHA: &[u8] = b"ABCDEFGHJKLMNPQRTUVWXYZ234789";
 fn room_code() -> String {
     let mut r = rand::rng();
     (0..5).map(|_| ALPHA[(r.next_u32() as usize) % ALPHA.len()] as char).collect()

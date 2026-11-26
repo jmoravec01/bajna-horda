@@ -13,7 +13,7 @@ pub enum Out { Text(String), Close(u16), Ping }
 
 struct Member {
     id: u64, tx: Sender<Out>, user_id: Option<i64>, name: String, cls: String, ch: Option<Char>, room: Option<String>, pid: u32, left: bool,
-    msgs: u32, tick: Instant, last_seen: Instant,
+    msgs: u32, tick: Instant, last_seen: Instant, born: Instant, misses: u8,
 }
 struct Room {
     code: String, owner_id: i64, owner_name: String, members: Vec<u64>, running: bool, dun: String, sim: Option<Sim>, evbuf: Vec<Ev>, last: Instant, acc: f64, gen: u64,
@@ -47,7 +47,7 @@ impl Hub {
             Some(uid) => (if who.char_id != 0 { self.db.get_char(who.char_id, uid) } else { None }).or_else(|| self.db.load_profile(uid).and_then(|p| p.chars.into_iter().next())),
             None => Some(new_char(0, &who.name, &who.cls)),   // guests join with a fresh level-1 character
         };
-        s.members.insert(id, Member { id, tx, user_id: who.user_id, name: who.name, cls: who.cls, ch, room: None, pid: 0, left: false, msgs: 0, tick: Instant::now(), last_seen: Instant::now() });
+        s.members.insert(id, Member { id, tx, user_id: who.user_id, name: who.name, cls: who.cls, ch, room: None, pid: 0, left: false, msgs: 0, tick: Instant::now(), last_seen: Instant::now(), born: Instant::now(), misses: 0 });
         id
     }
 
@@ -61,7 +61,7 @@ impl Hub {
     pub fn heartbeat(&self) {
         let s = self.lock();
         for m in s.members.values() {
-            if m.last_seen.elapsed().as_secs() > 70 { let _ = m.tx.try_send(Out::Close(1001)); } else { let _ = m.tx.try_send(Out::Ping); }
+            if m.last_seen.elapsed().as_secs() > 70 || (m.room.is_none() && m.born.elapsed().as_secs() > 45) { let _ = m.tx.try_send(Out::Close(1001)); } else { let _ = m.tx.try_send(Out::Ping); }
         }
     }
 
@@ -145,7 +145,11 @@ impl Hub {
                     s.next_gen += 1; let gen = s.next_gen;
                     s.rooms.insert(code.to_string(), Room { code: code.to_string(), owner_id: oid, owner_name: oname, members: vec![], running: false, dun: "m1".into(), sim: None, evbuf: vec![], last: Instant::now(), acc: 0.0, gen });
                 }
-                _ => return err(s, "not_found"),
+                _ => {
+                    // room-code guessing: a few misses and the socket is closed
+                    if let Some(m) = s.members.get_mut(&id) { m.misses += 1; if m.misses >= 5 { let _ = m.tx.try_send(Out::Close(1008)); } }
+                    return err(s, "not_found");
+                }
             }
         }
         let room = s.rooms.get(code).unwrap();
