@@ -1,12 +1,12 @@
 // Deterministic game simulation. One Sim = one run (1..6 players). The same file runs in the browser (single player)
 // and on the server (co-op). Everything random goes through this.rnd(), never Math.random().
-import { DT, ARCH, CLASS, WEAPON, WEAPON_IDX, WEAPONS, PASSIVES, DUNGEON, MAX_WEAPONS, MAX_PASSIVES, MAX_ITEM_LVL, BOSS_AT, RUN_SECONDS } from './data.js';
+import { DT, ARCH, CLASS, WEAPON, WEAPON_IDX, WEAPONS, PASSIVES, DUNGEON, MAX_WEAPONS, MAX_PASSIVES, MAX_ITEM_LVL, BOSS_STAGES, PACE } from './data.js';
 import { charStats, power } from './meta.js';
 
 export const CULL = 270;            // entities farther than this from a player are not sent to him
-const BASE_SPEED = 52, BASE_HP = 100, PICKUP_R = 26, CELL = 24;
+const BASE_SPEED = 52, BASE_HP = 100, PICKUP_R = 26, TOUCH_R = 10, CELL = 24;
 const PERSONAL = new Set(['L', 'u', 'x', 'g', '$', '+', 'M', 'C', 'm', 'v']);   // events only the owner needs
-const HARD_END = 900;               // seconds; a run never lasts longer
+const HARD_END = 480;               // seconds; the last boss has three minutes, then the run fails
 
 export function mulberry32(a) {
   return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -34,7 +34,7 @@ export class Sim {
     this.dun = DUNGEON[dungeonId];
     this.tick = 0; this.nid = 1;
     this.players = []; this.enemies = []; this.objs = []; this.ebul = []; this.picks = [];
-    this.ev = []; this.over = null; this.spawnAcc = 0; this.eliteDone = 0; this.boss = null; this.bossWarn = false;
+    this.ev = []; this.over = null; this.spawnAcc = 0; this.eliteDone = 0; this.bossN = 0;
     this.grid = new Map();
     for (const [i, c] of players.entries()) this.players.push(this.makePlayer(i + 1, c));
     const n = this.players.length, top = Math.max(...this.players.map((p) => p.power));
@@ -137,9 +137,13 @@ export class Sim {
     e.dead = true;
     this.emit('d', r1(e.x), r1(e.y), e.boss ? 2 : e.elite ? 1 : 0);
     if (p) p.kills++;
-    if (e.boss) { this.finish(true); return; }
+    if (e.boss) {
+      if (e.stage === BOSS_STAGES.length - 1) { this.finish(true); return; }          // the last boss clears the dungeon
+      this.drop(e.x, e.y, 6, 0); for (let i = 0; i < 4; i++) this.drop(e.x + Math.cos(i * 1.6) * 8, e.y + Math.sin(i * 1.6) * 8, 3, 5);     // the others pay with a chest and coins
+      return;
+    }
     const owner = p || this.players[0];
-    const xp = e.xp * (1 + 0.15 * Math.min(4, this.tick * DT / 120));
+    const xp = e.xp * (1 + 0.15 * Math.min(4, this.tick * DT * PACE / 120));
     this.drop(e.x, e.y, xp < 3 ? 0 : xp < 8 ? 1 : 2, xp);
     if (e.elite) { this.drop(e.x + 4, e.y, 6, 0); return; }
     const r = this.rnd();
@@ -213,18 +217,20 @@ export class Sim {
   // ---------- enemy spawning ----------
   director(T, alive) {
     const d = this.dun, n = this.players.length;
-    // elites at 2:30 and 4:30, boss at BOSS_AT
-    if (this.eliteDone < 2 && T >= 150 + this.eliteDone * 120) { this.eliteDone++; this.spawn(alive, 5, true); }
-    if (!this.boss && T >= BOSS_AT) { this.boss = this.spawn(alive, 6, true); this.emit('B'); }
-    const ramp = Math.min(T, 420) / 60;
-    let rate = (0.7 + 0.9 * ramp) * this.cMul * (this.boss ? 0.5 : 1);
+    const Tp = T * PACE;                                   // difficulty clock
+    // elites at 2:00 and 4:00; bosses at 1:00, 3:00 and 5:00
+    if (this.eliteDone < 2 && T >= 120 + this.eliteDone * 120) { this.eliteDone++; this.spawn(alive, 5, true); }
+    const st = BOSS_STAGES[this.bossN];
+    if (st && T >= st.at) { this.spawn(alive, 6 + this.bossN, true); this.bossN++; this.emit('B', this.bossN); }
+    const ramp = Math.min(Tp, 480) / 60;
+    let rate = (0.7 + 0.9 * ramp) * this.cMul * (this.enemies.some((e) => e.boss && !e.dead) ? 0.5 : 1);
     const cap = Math.round((60 + 22 * ramp) * (1 + 0.5 * (n - 1)));
     this.spawnAcc += rate * DT;
     while (this.spawnAcc >= 1) {
       this.spawnAcc -= 1;
       if (this.enemies.length >= cap) continue;
       let tot = 0; const avail = [];
-      for (const [i, r] of d.roster.entries()) if (T >= r[2]) { avail.push(i); tot += d.roster[i][3] * (i === avail.length - 1 && T - r[2] > 120 ? 1 : 1); }
+      for (const [i, r] of d.roster.entries()) if (Tp >= r[2]) { avail.push(i); tot += d.roster[i][3] * (i === avail.length - 1 && 1); }
       let x = this.rnd() * tot, idx = avail[0];
       for (const i of avail) { x -= d.roster[i][3]; if (x <= 0) { idx = i; break; } }
       const group = ARCH[d.roster[idx][0]].beh === 'zig' ? 3 + Math.floor(this.rnd() * 3) : 1;
@@ -237,15 +243,16 @@ export class Sim {
     const target = alive[Math.floor(this.rnd() * alive.length)];
     const a = this.rnd() * 6.283, dist = 235 + this.rnd() * 20;
     let arch, pal, hpBase, scale = 1, elite = false, boss = false;
-    if (idx === 6) { arch = ARCH[d.boss.arch]; pal = d.boss.pal; hpBase = d.boss.hp; scale = d.boss.scale || 2.6; boss = true; }
+    const bst = BOSS_STAGES[idx - 6];
+    if (idx >= 6) { arch = ARCH[d.boss.arch]; pal = d.boss.pal; hpBase = d.boss.hp * bst.hp; scale = (d.boss.scale || 2.6) * bst.size; boss = true; }
     else if (idx === 5) { arch = ARCH[d.elite[0]]; pal = d.elite[1]; hpBase = arch.hp * 8; scale = 1.5; elite = true; }
     else { arch = ARCH[d.roster[idx][0]]; hpBase = arch.hp; }
-    const tsHp = 1 + T / 60 * 0.6, tsDmg = 1 + T / 60 * 0.12;
+    const Tp = T * PACE, tsHp = 1 + Tp / 60 * 0.6, tsDmg = 1 + Tp / 60 * 0.12;
     const hp = hpBase * (boss ? 1 : tsHp) * this.eMul * d.diff;
     const e = { id: this.nid++, type: idx, arch, beh: arch.beh, x: target.x + Math.cos(a) * dist, y: target.y + Math.sin(a) * dist,
-      hp, maxHp: hp, dmg: arch.dmg * (boss ? 1.3 : 1) * tsDmg * this.dMul * Math.sqrt(d.diff), spd: arch.spd * (boss ? 0.8 : 1) * (1 + this.rnd() * 0.12), r: arch.r * scale, xp: arch.xp * (elite ? 6 : 1),
+      hp, maxHp: hp, dmg: arch.dmg * (boss ? 1.3 * bst.dmg : 1) * tsDmg * this.dMul * Math.sqrt(d.diff), spd: arch.spd * (boss ? 0.8 : 1) * (1 + this.rnd() * 0.12), r: arch.r * scale, xp: arch.xp * (elite ? 6 : 1),
       kx: 0, ky: 0, t: this.rnd() * 3, dead: false, flash: 0, slowUntil: 0, slowF: 0, freezeUntil: 0, hm: null, boss, elite, big: arch.r * scale >= 8, st: 0, dashX: 0, dashY: 0 };
-    if (boss) { e.beh = 'boss'; e.bt = 3; e.bs = 8; e.xp = 0; }
+    if (boss) { e.beh = 'boss'; e.bt = 3; e.bs = bst.every; e.xp = 0; e.stage = idx - 6; }
     this.enemies.push(e);
     return e;
   }
@@ -299,14 +306,14 @@ export class Sim {
   }
 
   bossAI(e, T, tp, ux, uy, dist) {
-    const enrage = T > RUN_SECONDS ? 1.5 : 1;
+    const st = BOSS_STAGES[e.stage], enrage = e.stage === BOSS_STAGES.length - 1 && T > st.at + 60 ? 1.5 : 1;   // the last boss gets angry after a minute
     if ((e.bt -= DT) <= 0) {            // ring of bullets
-      e.bt = 3 / enrage; const n = 14, off = this.rnd() * 6.283;
+      e.bt = 3 / enrage; const n = st.ring, off = this.rnd() * 6.283;
       for (let i = 0; i < n; i++) { const a = off + i / n * 6.283; this.ebul.push({ id: this.nid++, x: e.x, y: e.y, vx: Math.cos(a) * 45, vy: Math.sin(a) * 45, dmg: e.dmg * 0.6, life: 5 }); }
     }
     if ((e.bs -= DT) <= 0) {            // minions
-      e.bs = 8 / enrage;
-      for (let i = 0; i < 6; i++) { const m = this.spawn([tp], Math.min(1, this.dun.roster.length - 1), false); m.x = e.x + Math.cos(i) * 20; m.y = e.y + Math.sin(i) * 20; }
+      e.bs = st.every / enrage;
+      for (let i = 0; i < st.minions; i++) { const m = this.spawn([tp], Math.min(1, this.dun.roster.length - 1), false); m.x = e.x + Math.cos(i) * 20; m.y = e.y + Math.sin(i) * 20; }
     }
     if (dist < 12) e.spd = 0; else e.spd = ARCH[this.dun.boss.arch].spd * 0.8;
   }
@@ -464,7 +471,8 @@ export class Sim {
     for (const g of this.picks) {
       let taken = false, best = null, bd = Infinity;
       for (const p of alive) {
-        const d2 = (p.x - g.x) ** 2 + (p.y - g.y) ** 2, rad = PICKUP_R * p.st.magnet * (p.cl.magnet || 1) * (1 + 0.25 * this.pl(p, 'magnet'));
+        // only xp gems and coins (tiers 0-3) are pulled in; hearts, magnets and chests (upgrades) must be walked over
+        const d2 = (p.x - g.x) ** 2 + (p.y - g.y) ** 2, rad = g.tier <= 3 ? PICKUP_R * p.st.magnet * (p.cl.magnet || 1) * (1 + 0.25 * this.pl(p, 'magnet')) : TOUCH_R;
         if (d2 < bd) { bd = d2; best = p; }
         if (g.mag || d2 < rad * rad) { g.mag = true; best = p; bd = d2; break; }
       }
@@ -487,7 +495,7 @@ export class Sim {
       }
       case 3: p.coins += g.v * (p.cl.coins || 1); this.emit('$', p.id); break;
       case 4: p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.25); this.emit('+', p.id); break;
-      case 5: for (const o of this.picks) o.mag = true; this.emit('M', p.id); break;
+      case 5: for (const o of this.picks) if (o.tier <= 3) o.mag = true; this.emit('M', p.id); break;
       case 6: p.coins += 15; p.pending.push(this.choices(p)); this.emit('C', p.id); break;
     }
   }
@@ -532,7 +540,7 @@ export class Sim {
     for (const b of this.ebul) if (near(b.x, b.y)) s.b.push([b.id, r1(b.x), r1(b.y)]);
     for (const g of this.picks) if (near(g.x, g.y)) s.g.push([g.id, g.tier, r1(g.x), r1(g.y)]);
     s.me = { xp: Math.floor(me.xp), need: lvlNeed(me.level), level: me.level, coins: Math.floor(me.coins), kills: me.kills, spd: r1(me.spd), pend: me.pending.length, ch: me.pending[0] || null,
-      w: me.weapons.map((w) => [WEAPON_IDX[w.id], w.lvl]), ps: me.passives, dead: me.dead, boss: this.boss && !this.boss.dead ? Math.max(1, Math.round(this.boss.hp / this.boss.maxHp * 100)) : 0 };
+      w: me.weapons.map((w) => [WEAPON_IDX[w.id], w.lvl]), ps: me.passives, dead: me.dead, boss: ((b) => (b ? Math.max(1, Math.round(b.hp / b.maxHp * 100)) : 0))(this.enemies.find((e) => e.boss && !e.dead)) };
     if (this.over) s.over = this.over;
     return s;
   }

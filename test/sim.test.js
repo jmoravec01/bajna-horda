@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sim } from '../shared/sim.js';
-import { CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, ARMS, ARM, ARM_TIERS, MAX_PLUS, STARTER } from '../shared/data.js';
+import { CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, BOSS_STAGES, ARMS, ARM, ARM_TIERS, MAX_PLUS, STARTER } from '../shared/data.js';
 import { newChar, power, charStats, applyRun, upgradeEquip, armError, armOf, armDmg, armUpCost, fixArms, createChar, newProfile, xpNeed, runReward, validName, unlocked } from '../shared/meta.js';
 import { runBot } from '../tools/bot.js';
 
@@ -54,8 +54,8 @@ test('co-op: a downed player is revived by standing next to him', () => {
 
 test('boss kill clears the run; all players dead fails it', () => {
   const sim = new Sim({ seed: 2, dungeonId: 's1', players: [ch('golem', 30)] });
-  sim.tick = 20 * 395; sim.step();
-  const boss = sim.enemies.find((e) => e.boss); assert.ok(boss);
+  sim.tick = 20 * 301; for (let i = 0; i < 3; i++) sim.step();          // a late start spawns the three bosses one after another
+  const boss = sim.enemies.find((e) => e.boss && e.stage === 2); assert.ok(boss);
   sim.hurtEnemy(boss, 1e9, sim.players[0]);
   assert.equal(sim.over.cleared, true);
   const s2 = new Sim({ seed: 2, dungeonId: 's1', players: [ch('bohatyr')] });
@@ -123,4 +123,37 @@ test('armory: 48 weapons, unique ids, buy / equip / upgrade to +9, stronger weap
   const old = { equip: { weapon: 5, armor: 2, ring: 1, boots: 1 }, level: 1 }; fixArms(old);   // legacy numeric weapon level
   assert.deepEqual([old.held, old.arms, 'weapon' in old.equip], [STARTER, { [STARTER]: 4 }, false]);
   assert.ok(ARM_TIERS.every((t, i) => !i || t.dmg > ARM_TIERS[i - 1].dmg));
+});
+
+test('magnet: pulls only xp gems and coins, never chests (upgrades) or hearts', () => {
+  const sim = new Sim({ seed: 9, dungeonId: 's1', players: [ch('bohatyr')] });
+  const p = sim.players[0]; p.passives.magnet = 5; sim.recalc(p);
+  sim.drop(p.x + 20, p.y, 6, 1); sim.drop(p.x, p.y + 20, 4, 1); sim.drop(p.x - 20, p.y, 3, 5); sim.drop(p.x, p.y - 20, 0, 1);   // all inside the pickup radius
+  sim.drop(p.x + 8, p.y, 5, 1);                                                                                                      // a magnet item, within touching distance
+  sim.drop(p.x + 150, p.y + 150, 3, 5); sim.drop(p.x - 150, p.y + 150, 6, 1);                                                          // far coin and far chest
+  for (let i = 0; i < 100; i++) { sim.setInput(1, 0, 0); sim.step(); }
+  assert.ok(p.coins >= 10, 'both coins were pulled in, even the far one'); assert.equal(p.pending.length, 0);
+  assert.deepEqual(sim.picks.map((g) => g.tier).sort(), [4, 6, 6]);       // heart and both chests are still lying there
+});
+
+test('three bosses at 1:00, 3:00 and 5:00, each tougher; only the last one clears the dungeon', () => {
+  const sim = new Sim({ seed: 4, dungeonId: 's1', players: [ch('golem', 30)] });
+  const hp = [], seen = [];
+  for (const [i, at] of BOSS_STAGES.map((b) => b.at).entries()) {
+    sim.tick = Math.round(at * 20) + 1; sim.step();
+    const b = sim.enemies.find((e) => e.boss && e.stage === i); assert.ok(b, 'boss ' + i);
+    assert.ok(!sim.enemies.some((e) => e.boss && e.stage === i + 1), 'the next one is not there yet');
+    hp.push(b.maxHp); seen.push(b.type);
+    if (i < 2) { sim.hurtEnemy(b, 1e9, sim.players[0]); assert.equal(sim.over, null); assert.ok(sim.picks.some((g) => g.tier === 6), 'a chest'); }
+  }
+  assert.ok(hp[0] < hp[1] && hp[1] < hp[2]); assert.deepEqual(seen, [6, 7, 8]);
+  assert.ok(sim.snapshot(1).me.boss > 0);
+});
+
+test('no run is longer than HARD_END and the pacing keeps getting harder', () => {
+  const a = new Sim({ seed: 3, dungeonId: 's1', players: [ch('bohatyr', 10)] });
+  a.tick = 20 * 30; a.step(); const early = a.spawn([a.players[0]], 0, false).maxHp;
+  a.tick = 20 * 280; a.step(); const late = a.spawn([a.players[0]], 0, false).maxHp;
+  assert.ok(late > early * 2.5);
+  a.tick = 20 * 481; a.step(); assert.equal(a.over?.cleared, false);
 });

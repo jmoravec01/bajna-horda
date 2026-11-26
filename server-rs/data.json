@@ -3,8 +3,7 @@
   "DT": 0.05,
   "MAX_CHARS": 8,
   "MAX_PLAYERS": 6,
-  "RUN_SECONDS": 480,
-  "BOSS_AT": 390,
+  "RUN_SECONDS": 300,
   "MAX_LEVEL": 100,
   "MAX_WEAPONS": 5,
   "MAX_PASSIVES": 5,
@@ -592,6 +591,36 @@
     "hp": 5200,
     "scale": 2.8
    }
+  }
+ ],
+ "pace": 1.1,
+ "boss_stages": [
+  {
+   "at": 60,
+   "hp": 0.05,
+   "dmg": 0.5,
+   "size": 0.6,
+   "ring": 6,
+   "minions": 2,
+   "every": 12
+  },
+  {
+   "at": 180,
+   "hp": 0.25,
+   "dmg": 0.7,
+   "size": 0.8,
+   "ring": 9,
+   "minions": 4,
+   "every": 10
+  },
+  {
+   "at": 300,
+   "hp": 0.7,
+   "dmg": 1,
+   "size": 1,
+   "ring": 14,
+   "minions": 6,
+   "every": 8
   }
  ],
  "slots": [

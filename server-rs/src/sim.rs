@@ -8,8 +8,9 @@ pub const CULL: f64 = 270.0;
 const BASE_SPEED: f64 = 52.0;
 const BASE_HP: f64 = 100.0;
 const PICKUP_R: f64 = 26.0;
+const TOUCH_R: f64 = 10.0;      // hearts, magnets and chests are not pulled in: walk over them
 const CELL: f64 = 24.0;
-const HARD_END: f64 = 900.0;
+const HARD_END: f64 = 480.0;      // seconds; the last boss has three minutes, then the run fails
 
 pub struct Rng(u32);
 impl Rng {
@@ -75,7 +76,7 @@ pub struct Enemy {
     id: i64, typ: usize, beh: String, x: f64, y: f64, hp: f64, max_hp: f64, dmg: f64, spd: f64, r: f64, xp: f64,
     kx: f64, ky: f64, t: f64, dead: bool, flash: i32, slow_until: f64, slow_f: f64, freeze_until: f64,
     burn_until: f64, burn_dps: f64, burn_owner: Option<usize>, hm: HashMap<i64, f64>,
-    boss: bool, elite: bool, big: bool, st: f64, dash_x: f64, dash_y: f64, bt: f64, bs: f64, arch_spd: f64,
+    boss: bool, stage: usize, elite: bool, big: bool, st: f64, dash_x: f64, dash_y: f64, bt: f64, bs: f64, arch_spd: f64,
 }
 
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
@@ -93,7 +94,7 @@ struct Pick { id: i64, tier: u8, x: f64, y: f64, v: f64, mag: bool }
 
 #[derive(Clone)]
 pub enum Ev {
-    Hit(f64, f64), Crit(f64, f64), Die(f64, f64, u8), Ring(f64, f64, f64, usize), Boom(f64, f64, f64), Chain(Vec<f64>), BossWarn, Atk(f64, f64, u32, usize),
+    Hit(f64, f64), Crit(f64, f64), Die(f64, f64, u8), Ring(f64, f64, f64, usize), Boom(f64, f64, f64), Chain(Vec<f64>), BossWarn(usize), Atk(f64, f64, u32, usize),
     Personal(char, u32),   // L u x g $ + M C m v: only the owner needs these
 }
 
@@ -116,7 +117,7 @@ pub struct Sim {
     pub over: Option<Over>,
     spawn_acc: f64,
     elite_done: u32,
-    boss: Option<i64>,
+    boss_n: usize,
     grid: HashMap<i64, Vec<usize>>,
     pub threat: f64,
     pub e_mul: f64,
@@ -130,7 +131,7 @@ impl Sim {
         let dun = dungeon(dungeon_id).expect("dungeon");
         let mut sim = Sim {
             rnd: Rng::new(seed), dun, tick: 0, nid: 1, players: vec![], enemies: vec![], objs: vec![], ebul: vec![], picks: vec![], ev: vec![], over: None,
-            spawn_acc: 0.0, elite_done: 0, boss: None, grid: HashMap::new(), threat: 0.0, e_mul: 1.0, d_mul: 1.0, c_mul: 1.0, louze: weapon_idx("louze"),
+            spawn_acc: 0.0, elite_done: 0, boss_n: 0, grid: HashMap::new(), threat: 0.0, e_mul: 1.0, d_mul: 1.0, c_mul: 1.0, louze: weapon_idx("louze"),
         };
         for (i, c) in players.into_iter().enumerate() { let p = sim.make_player(i as u32 + 1, c); sim.players.push(p); }
         let n = sim.players.len();
@@ -269,12 +270,17 @@ impl Sim {
     }
     fn kill(&mut self, ei: usize, owner: Option<usize>) {
         self.enemies[ei].dead = true;
-        let (x, y, boss, elite, exp) = { let e = &self.enemies[ei]; (e.x, e.y, e.boss, e.elite, e.xp) };
+        let (x, y, boss, stage, elite, exp) = { let e = &self.enemies[ei]; (e.x, e.y, e.boss, e.stage, e.elite, e.xp) };
         self.emit(Ev::Die(r1(x), r1(y), if boss { 2 } else if elite { 1 } else { 0 }));
         if let Some(pi) = owner { self.players[pi].kills += 1; }
-        if boss { self.finish(true); return; }
+        if boss {
+            if stage + 1 == data().boss_stages.len() { self.finish(true); return; }      // the last boss clears the dungeon
+            self.drop(x, y, 6, 0.0);                                                       // the others pay with a chest and coins
+            for i in 0..4 { let a = i as f64 * 1.6; self.drop(x + a.cos() * 8.0, y + a.sin() * 8.0, 3, 5.0); }
+            return;
+        }
         let oi = owner.unwrap_or(0);
-        let xp = exp * (1.0 + 0.15 * (self.now() / 120.0).min(4.0));
+        let xp = exp * (1.0 + 0.15 * (self.now() * data().pace / 120.0).min(4.0));
         self.drop(x, y, if xp < 3.0 { 0 } else if xp < 8.0 { 1 } else { 2 }, xp);
         if elite { self.drop(x + 4.0, y, 6, 0.0); return; }
         let r = self.rnd.next();
@@ -388,17 +394,21 @@ impl Sim {
     fn director(&mut self, t: f64, alive: &[usize]) {
         let dt = data().consts.dt;
         let n = self.players.len();
-        if self.elite_done < 2 && t >= 150.0 + self.elite_done as f64 * 120.0 { self.elite_done += 1; self.spawn(alive, 5); }
-        if self.boss.is_none() && t >= data().consts.boss_at { let id = self.spawn(alive, 6); self.boss = Some(id); self.emit(Ev::BossWarn); }
-        let ramp = t.min(420.0) / 60.0;
-        let rate = (0.7 + 0.9 * ramp) * self.c_mul * if self.boss.is_some() { 0.5 } else { 1.0 };
+        let tp = t * data().pace;                                  // difficulty clock
+        // elites at 2:00 and 4:00; bosses at 1:00, 3:00 and 5:00
+        if self.elite_done < 2 && t >= 120.0 + self.elite_done as f64 * 120.0 { self.elite_done += 1; self.spawn(alive, 5); }
+        if let Some(st) = data().boss_stages.get(self.boss_n) {
+            if t >= st.at { self.spawn(alive, 6 + self.boss_n); self.boss_n += 1; self.emit(Ev::BossWarn(self.boss_n)); }
+        }
+        let ramp = tp.min(480.0) / 60.0;
+        let rate = (0.7 + 0.9 * ramp) * self.c_mul * if self.enemies.iter().any(|e| e.boss && !e.dead) { 0.5 } else { 1.0 };
         let cap = js_round((60.0 + 22.0 * ramp) * (1.0 + 0.5 * (n as f64 - 1.0))) as usize;
         self.spawn_acc += rate * dt;
         while self.spawn_acc >= 1.0 {
             self.spawn_acc -= 1.0;
             if self.enemies.len() >= cap { continue; }
             let d = self.dun;
-            let avail: Vec<usize> = (0..d.roster.len()).filter(|&i| t >= d.roster[i].at).collect();
+            let avail: Vec<usize> = (0..d.roster.len()).filter(|&i| t * data().pace >= d.roster[i].at).collect();
             let tot: f64 = avail.iter().map(|&i| d.roster[i].weight).sum();
             let mut x = self.rnd.next() * tot;
             let mut idx = avail[0];
@@ -415,19 +425,21 @@ impl Sim {
         let a = self.rnd.next() * 6.283;
         let dist = 235.0 + self.rnd.next() * 20.0;
         let (arch, hp_base, scale, elite, boss);
-        if idx == 6 { arch = &data().arch[&d.boss.arch]; hp_base = d.boss.hp; scale = d.boss.scale; boss = true; elite = false; }
+        let bst = data().boss_stages.get(idx.wrapping_sub(6));
+        if let Some(b) = bst { arch = &data().arch[&d.boss.arch]; hp_base = d.boss.hp * b.hp; scale = d.boss.scale * b.size; boss = true; elite = false; }
         else if idx == 5 { arch = &data().arch[&d.elite]; hp_base = arch.hp * 8.0; scale = 1.5; elite = true; boss = false; }
         else { arch = &data().arch[&d.roster[idx].arch]; hp_base = arch.hp; scale = 1.0; elite = false; boss = false; }
-        let ts_hp = 1.0 + t / 60.0 * 0.6;
-        let ts_dmg = 1.0 + t / 60.0 * 0.12;
+        let tpace = t * data().pace;
+        let ts_hp = 1.0 + tpace / 60.0 * 0.6;
+        let ts_dmg = 1.0 + tpace / 60.0 * 0.12;
         let hp = hp_base * if boss { 1.0 } else { ts_hp } * self.e_mul * d.diff;
         let (tx, ty) = (self.players[target].x, self.players[target].y);
         let id = self.nid; self.nid += 1;
         let spd = arch.spd * if boss { 0.8 } else { 1.0 } * (1.0 + self.rnd.next() * 0.12);
         let mut e = Enemy { id, typ: idx, beh: arch.beh.clone(), x: tx + a.cos() * dist, y: ty + a.sin() * dist, hp, max_hp: hp,
-            dmg: arch.dmg * if boss { 1.3 } else { 1.0 } * ts_dmg * self.d_mul * d.diff.sqrt(), spd, r: arch.r * scale, xp: arch.xp * if elite { 6.0 } else { 1.0 },
+            dmg: arch.dmg * if boss { 1.3 * bst.map_or(1.0, |b| b.dmg) } else { 1.0 } * ts_dmg * self.d_mul * d.diff.sqrt(), spd, r: arch.r * scale, xp: arch.xp * if elite { 6.0 } else { 1.0 },
             t: self.rnd.next() * 3.0, boss, elite, big: arch.r * scale >= 8.0, arch_spd: arch.spd, ..Default::default() };
-        if boss { e.beh = "boss".to_string(); e.bt = 3.0; e.bs = 8.0; e.xp = 0.0; }
+        if boss { e.beh = "boss".to_string(); e.bt = 3.0; e.bs = bst.map_or(8.0, |b| b.every); e.xp = 0.0; e.stage = idx - 6; }
         self.enemies.push(e);
         id
     }
@@ -531,11 +543,13 @@ impl Sim {
 
     fn boss_ai(&mut self, i: usize, t: f64, tp: usize, dist: f64) {
         let dt = data().consts.dt;
-        let enrage = if t > data().consts.run_seconds { 1.5 } else { 1.0 };
+        let stages = &data().boss_stages;
+        let st = &stages[self.enemies[i].stage];
+        let enrage = if self.enemies[i].stage + 1 == stages.len() && t > st.at + 60.0 { 1.5 } else { 1.0 };   // the last boss gets angry after a minute
         self.enemies[i].bt -= dt;
         if self.enemies[i].bt <= 0.0 {
             self.enemies[i].bt = 3.0 / enrage;
-            let n = 14; let off = self.rnd.next() * 6.283;
+            let n = st.ring; let off = self.rnd.next() * 6.283;
             let (x, y, dmg) = { let e = &self.enemies[i]; (e.x, e.y, e.dmg) };
             for k in 0..n {
                 let a = off + k as f64 / n as f64 * 6.283;
@@ -545,10 +559,10 @@ impl Sim {
         }
         self.enemies[i].bs -= dt;
         if self.enemies[i].bs <= 0.0 {
-            self.enemies[i].bs = 8.0 / enrage;
+            self.enemies[i].bs = st.every / enrage;
             let idx = 1.min(self.dun.roster.len() - 1);
             let (bx, by) = (self.enemies[i].x, self.enemies[i].y);
-            for k in 0..6 {
+            for k in 0..st.minions {
                 let _ = self.spawn(&[tp], idx);
                 let m = self.enemies.len() - 1;
                 self.enemies[m].x = bx + (k as f64).cos() * 20.0; self.enemies[m].y = by + (k as f64).sin() * 20.0;
@@ -777,13 +791,13 @@ impl Sim {
         let mut keep: Vec<Pick> = Vec::with_capacity(picks.len());
         let mut all_mag = false;
         for mut g in picks {
-            if all_mag { g.mag = true; }
+            if all_mag && g.tier <= 3 { g.mag = true; }
             let mut taken = false;
             let mut best: Option<usize> = None; let mut bd = f64::INFINITY;
             for &pi in alive {
                 let p = &self.players[pi];
                 let d2 = dist2(p.x, p.y, g.x, g.y);
-                let rad = PICKUP_R * p.st.magnet * or1(p.cl.magnet) * (1.0 + 0.25 * Self::pl(p, "magnet") as f64);
+                let rad = if g.tier <= 3 { PICKUP_R * p.st.magnet * or1(p.cl.magnet) * (1.0 + 0.25 * Self::pl(p, "magnet") as f64) } else { TOUCH_R };
                 if d2 < bd { bd = d2; best = Some(pi); }
                 if g.mag || d2 < rad * rad { g.mag = true; best = Some(pi); bd = d2; break; }
             }
@@ -796,7 +810,7 @@ impl Sim {
             }
             if !taken { keep.push(g); }
         }
-        if all_mag { for g in keep.iter_mut() { g.mag = true; } }
+        if all_mag { for g in keep.iter_mut().filter(|g| g.tier <= 3) { g.mag = true; } }
         self.picks = keep;
         if self.picks.len() > 400 { let n = self.picks.len() - 400; self.picks.drain(0..n); }
     }
@@ -879,7 +893,7 @@ impl Sim {
         for e in evs {
             match e {
                 Ev::Personal(k, id) => { if *id == pid { v.push(json!([k.to_string(), id])); } }
-                Ev::BossWarn => v.push(json!(["B"])),
+                Ev::BossWarn(n) => v.push(json!(["B", n])),
                 Ev::Chain(pts) => { if near(pts[0], pts[1]) { v.push(json!(["c", pts])); } }
                 Ev::Hit(x, y) => { if near(*x, *y) { v.push(json!(["h", x, y])); } }
                 Ev::Crit(x, y) => { if near(*x, *y) { v.push(json!(["k", x, y])); } }
@@ -902,7 +916,7 @@ impl Sim {
         let gs: Vec<Value> = self.picks.iter().filter(|g| near(g.x, g.y)).map(|g| json!([g.id, g.tier, r1(g.x), r1(g.y)])).collect();
         let mut ps = serde_json::Map::new();
         for &(k, l) in &me.passives { ps.insert(data().passives[k].clone(), json!(l)); }
-        let boss_pct = match self.boss.and_then(|id| self.enemies.iter().find(|e| e.id == id && !e.dead)) { Some(b) => js_round(b.hp / b.max_hp * 100.0).max(1.0), None => 0.0 };
+        let boss_pct = match self.enemies.iter().find(|e| e.boss && !e.dead) { Some(b) => js_round(b.hp / b.max_hp * 100.0).max(1.0), None => 0.0 };
         let ch = me.pending.first().map(|c| c.iter().map(|Choice(k, id, l)| json!([k.to_string(), id, l])).collect::<Vec<_>>());
         let mut s = json!({
             "k": self.tick, "T": r1(now), "p": players, "e": es, "o": os, "b": bs, "g": gs, "v": v,
@@ -1000,13 +1014,29 @@ mod tests {
         for _ in 0..80 { s.step(); }
         assert!(!s.players[0].dead && s.players[0].hp > 0.0);
         let mut b = Sim::new(2, "s1", vec![input("golem", 30)]);
-        b.tick = 20 * 395; b.step();
-        let bi = b.enemies.iter().position(|e| e.boss).expect("boss spawned");
+        b.tick = 20 * 301; for _ in 0..3 { b.step(); }      // a late start spawns the three bosses one after another
+        let bi = b.enemies.iter().position(|e| e.boss && e.stage == 2).expect("last boss spawned");
         b.hurt_enemy(bi, 1e9, Some(0), false);
         assert!(b.over.as_ref().unwrap().cleared);
         let mut f = Sim::new(2, "s1", vec![input("bohatyr", 1)]);
         f.players[0].dead = true; f.step();
         assert!(!f.over.as_ref().unwrap().cleared);
+    }
+
+    #[test]
+    fn three_bosses_each_tougher_only_the_last_clears() {
+        let mut s = Sim::new(4, "s1", vec![input("golem", 30)]);
+        let mut hp = vec![];
+        for (i, at) in data().boss_stages.iter().map(|b| b.at).collect::<Vec<_>>().into_iter().enumerate() {
+            s.tick = (at * 20.0).round() as u64 + 1; s.step();
+            let bi = s.enemies.iter().position(|e| e.boss && e.stage == i).expect("boss spawned");
+            assert!(!s.enemies.iter().any(|e| e.boss && e.stage == i + 1));
+            hp.push(s.enemies[bi].max_hp);
+            if i < 2 { s.hurt_enemy(bi, 1e9, Some(0), false); assert!(s.over.is_none()); assert!(s.picks.iter().any(|g| g.tier == 6)); }
+        }
+        assert!(hp[0] < hp[1] && hp[1] < hp[2]);
+        let t = s.enemies.iter().position(|e| e.boss && e.stage == 2).unwrap();
+        s.hurt_enemy(t, 1e9, Some(0), false); assert!(s.over.as_ref().unwrap().cleared);
     }
 
     #[test]

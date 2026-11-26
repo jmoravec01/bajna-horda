@@ -171,7 +171,7 @@ export function render(ctx, W, H, sc, now, lastDir) {
       if (arch === 'ghost') ctx.globalAlpha = 0.75;
       ctx.drawImage(img, -(w >> 1), -(h >> 1), w, h);
       ctx.restore();
-      if (e[1] === 5 || e[1] === 6) { const bw = Math.max(14, w); ctx.fillStyle = '#000'; ctx.fillRect(px - (bw >> 1) - 1, py - h - 4, bw + 2, 4); ctx.fillStyle = e[1] === 6 ? '#e33' : '#f90'; ctx.fillRect(px - (bw >> 1), py - h - 3, Math.round(bw * e[4] / 100), 2); }
+      if (e[1] >= 5) { const bw = Math.max(14, w); ctx.fillStyle = '#000'; ctx.fillRect(px - (bw >> 1) - 1, py - h - 4, bw + 2, 4); ctx.fillStyle = e[1] >= 6 ? '#e33' : '#f90'; ctx.fillRect(px - (bw >> 1), py - h - 3, Math.round(bw * e[4] / 100), 2); }
     } else {
       const pl = sc.players.find((q) => q.id === e[0]) || { cls: 'bohatyr', name: '?' };
       const arm = pl.arm && armSprite(pl.arm) ? { s: armSprite(pl.arm), plus: pl.plus || 0 } : null, moving = e[0] === sc.meId ? lastDir : 1, fr = (moving && !e[5]) ? (Math.floor(now / 140) & 1) : 0, spr = heroSprite(pl.cls, fr);

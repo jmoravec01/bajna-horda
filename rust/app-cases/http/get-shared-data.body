@@ -3,8 +3,14 @@
 export const DT = 1 / 20;            // simulation step (s)
 export const MAX_CHARS = 8;          // characters per account
 export const MAX_PLAYERS = 6;        // players per room
-export const RUN_SECONDS = 480;      // nominal run length
-export const BOSS_AT = 390;          // the boss shows up at 6:30
+export const RUN_SECONDS = 300;      // a run is 5 minutes
+export const PACE = 1.1;             // the difficulty curves were tuned for 8 minutes: the difficulty clock runs a little faster than the wall clock (bot runs: 1.6 was far too hard)
+// three bosses, each harder than the last; killing the last one clears the dungeon. hp/dmg multiply the dungeon boss, size scales its sprite
+export const BOSS_STAGES = [
+  { at: 60,  hp: 0.05, dmg: 0.5,  size: 0.6, ring: 6,  minions: 2, every: 12 },
+  { at: 180, hp: 0.25, dmg: 0.7,  size: 0.8, ring: 9,  minions: 4, every: 10 },
+  { at: 300, hp: 0.7,  dmg: 1,    size: 1,   ring: 14, minions: 6, every: 8 },
+];
 export const MAX_LEVEL = 100;
 export const MAX_WEAPONS = 5, MAX_PASSIVES = 5, MAX_ITEM_LVL = 8;
 

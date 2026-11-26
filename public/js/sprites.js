@@ -1,5 +1,5 @@
 // Procedural pixel art: heroes, enemies, items, ground and a tiny 3x5 text font. All sprites are drawn once into small canvases.
-import { CLASS, DUNGEON, ARCH, ARM_TYPES } from '../shared/data.js';
+import { CLASS, DUNGEON, ARCH, ARM_TYPES, BOSS_STAGES } from '../shared/data.js';
 
 const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 const OUT = [17, 17, 17];
@@ -56,12 +56,12 @@ export function enemySprite(arch, pal) {
 }
 // radius of an enemy of this dungeon type, as the sim computes it
 export function enemyRadius(d, type) {
-  if (type === 6) return ARCH[d.boss.arch].r * (d.boss.scale || 2.6);
+  if (type >= 6) return ARCH[d.boss.arch].r * (d.boss.scale || 2.6) * BOSS_STAGES[type - 6].size;
   if (type === 5) return ARCH[d.elite[0]].r * 1.5;
   return ARCH[d.roster[type][0]].r;
 }
 export function enemyFor(d, type) {
-  if (type === 6) return [d.boss.arch, d.boss.pal];
+  if (type >= 6) return [d.boss.arch, d.boss.pal];
   if (type === 5) return [d.elite[0], d.elite[1]];
   return [d.roster[type][0], d.roster[type][1]];
 }

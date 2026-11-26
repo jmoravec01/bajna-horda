@@ -8,7 +8,7 @@
 {"name": "get-climb", "method": "GET", "path": "/shared/../server/db.js"}
 {"name": "get-health", "method": "GET", "path": "/health"}
 {"name": "get-api-unknown", "method": "GET", "path": "/api/nope"}
-{"name": "get-font", "method": "GET", "path": "/fonts/PixelifySans.woff2"}
+{"name": "get-font", "method": "GET", "path": "/fonts/Jersey15.woff2"}
 {"name": "head-index", "method": "HEAD", "path": "/"}
 {"name": "post-static", "method": "POST", "path": "/style.css"}
 {"name": "cors-preflight", "method": "OPTIONS", "path": "/api/login", "headers": {"Origin": "https://jmoravec01.github.io", "Access-Control-Request-Method": "POST"}}

@@ -10,13 +10,23 @@ pub struct Consts {
     pub max_chars: usize,
     pub max_players: usize,
     pub run_seconds: f64,
-    pub boss_at: f64,
     pub max_level: u32,
     pub max_weapons: usize,
     pub max_passives: usize,
     pub max_item_lvl: u32,
     pub max_equip: u32,
     pub max_plus: u32,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BossStage {
+    pub at: f64,
+    pub hp: f64,
+    pub dmg: f64,
+    pub size: f64,
+    pub ring: usize,
+    pub minions: usize,
+    pub every: f64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -123,6 +133,8 @@ pub struct Data {
     pub dungeons: Vec<Dungeon>,
     pub slots: Vec<String>,
     pub starter: String,
+    pub pace: f64,
+    pub boss_stages: Vec<BossStage>,
     pub arms: Vec<Arm>,
 }
 

@@ -41,7 +41,7 @@ function view(html, bind) {
 }
 const wbar = (v, max) => `<div class="mini"><i data-w="${Math.min(100, Math.round(v / max * 100))}"></i></div>`;
 const go = (name, ...a) => { S.screen = name; sfx('click'); SCREENS[name](...a); };
-const topbar = (back) => `<div class="top">${back ? `<button class="icon-btn" data-go="${back}">‹</button>` : '<span></span>'}<span class="who">${profile.user ? esc(profile.user) : (OFFLINE || !profile.user ? 'Host' : '')}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">${isMuted() ? '×' : '♪'}</button></div>`;
+const topbar = (back) => `<div class="top">${back ? `<button class="icon-btn" data-go="${back}">‹</button>` : '<span></span>'}<span class="who">${profile.user ? esc(profile.user) : (OFFLINE || !profile.user ? 'Host' : '')}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>`;
 function wire(root, extra) {
   root.onclick = (e) => {
     const g = e.target.closest('[data-go]'); if (g) return go(g.dataset.go);
@@ -51,13 +51,20 @@ function wire(root, extra) {
     extra?.(e);
   };
 }
+// a small modal message (instead of the browser alert)
+function popup(title, text) {
+  const el = document.createElement('div'); el.className = 'popup';
+  el.innerHTML = `<div class="card"><h3>${esc(title)}</h3><p>${esc(text)}</p><button class="btn">${t('ok')}</button></div>`;
+  el.onclick = (e) => { if (e.target === el || e.target.closest('.btn')) el.remove(); };
+  $app.append(el); sfx('click');
+}
 const note = (s) => { const el = $app.querySelector('.msg'); if (el) el.textContent = s; };
 
 const SCREENS = {
   title() {
     music('menu'); S.args = [];
     const parade = ['krakonos', 'zbojnik', 'perun', 'cert', 'vedma', 'baba'].map((c) => heroCv(c, 4)).join('');
-    view(`<div class="screen title"><div class="top"><span></span><span></span><span></span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">${isMuted() ? '×' : '♪'}</button></div>
+    view(`<div class="screen title"><div class="top"><span></span><span></span><span></span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>
       <h1 class="logo">BÁJNÁ<br>HORDA</h1><p class="sub">${t('sub')}</p><div class="parade">${parade}</div>
       ${OFFLINE ? `<p class="note">${t('offline_note')}</p>` : `<form class="auth" autocomplete="on"><input name="nick" maxlength="16" placeholder="${t('nick')}" autocomplete="username" required><input name="pass" type="password" placeholder="${t('pass')}" autocomplete="current-password" minlength="6" required>
         <div class="row"><button class="btn" data-act="login" type="submit">${t('login')}</button><button class="btn alt" data-act="register" type="button">${t('register')}</button></div></form>`}
@@ -77,7 +84,7 @@ const SCREENS = {
   home() {
     music('menu'); S.args = [];
     const c = activeChar();
-    const card = c ? charCard(c, true) : `<div class="card empty">${t('no_char')}</div>`;
+    const card = c ? charCard(c, true).replace('class="card char"', 'class="card char tap" data-go="chars" role="button"') : `<div class="card empty">${t('no_char')}</div>`;   // tap the hero card: character details
     view(`<div class="screen home">${topbar()}${card}
       <button class="btn big" data-go="single" ${c ? '' : 'disabled'}>${t('single')}</button>
       <button class="btn big alt" data-go="multi" ${c && !OFFLINE ? '' : 'disabled'}>${t('multi')}</button>
@@ -153,13 +160,13 @@ const SCREENS = {
   multi() {
     S.args = []; S.combo ||= []; const c = activeChar();
     view(`<div class="screen multi">${topbar('home')}<h2>${t('multi')}</h2>${charCard(c, true)}
-      ${profile.room ? `<button class="btn big" data-act="mine">${t('myroom')}</button>` : `<p class="note">${t('guest_mp')}</p>`}
+      <button class="btn big ${profile.room ? '' : 'locked'}" data-act="mine" ${profile.room ? '' : 'aria-disabled="true"'}>${t('myroom')}</button>${profile.room ? '' : `<p class="note">${t('guest_mp')}</p>`}
       <h3>${t('join')}</h3><p class="note">${t('faces_pick')}</p>
       <div class="slots">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}">${S.combo[i] != null ? heroCv(CLASSES[S.combo[i]].id, 4) : '?'}</button>`).join('')}</div>
       <div class="picker">${CLASSES.map((c, i) => `<button class="face" data-face="${i}">${heroCv(c.id, 3)}</button>`).join('')}</div>
       <p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
       S.msg = '';
-      if (e.target.closest('[data-act=mine]')) { S.combo = []; joinRoom(''); return; }
+      if (e.target.closest('[data-act=mine]')) { if (!profile.room) return popup(t('need_login'), t('need_login_d')); S.combo = []; joinRoom(''); return; }
       const f = e.target.closest('[data-face]'), sl = e.target.closest('[data-slot]');
       if (sl) { S.combo.splice(+sl.dataset.slot); sfx('click'); return SCREENS.multi(); }
       if (f && S.combo.length < 3) {
@@ -181,7 +188,7 @@ const SCREENS = {
     const duns = DUNGEONS.multi.map((d, i) => { const open = i < r.unlocked; return `<button class="dun mini ${r.dun === d.id ? 'sel' : ''} ${open ? '' : 'lock'}" data-d="${d.id}" ${host && open ? '' : 'disabled'}><b>${esc(nm(d))}</b><small>${open ? REC[d.id] : '×'}</small></button>`; }).join('');
     const chars = !profile.isGuest && profile.p.chars.length > 1 ? `<select id="chsel">${profile.p.chars.map((x) => `<option value="${x.id}" ${me && x.id === me.charId ? 'selected' : ''}>${esc(x.name)} · ${t('level')} ${x.level}</option>`).join('')}</select>` : '';
     const link = location.origin + location.pathname + '#/room/' + r.code;
-    view(`<div class="screen lobby"><div class="top"><button class="icon-btn" data-act="leave">‹</button><span class="who">${t('room_of')} ${esc(r.hostName)}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="snd">${isMuted() ? '×' : '♪'}</button></div>
+    view(`<div class="screen lobby"><div class="top"><button class="icon-btn" data-act="leave">‹</button><span class="who">${t('room_of')} ${esc(r.hostName)}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>
       <div class="card"><p class="note">${t('invite')}</p><div class="faces">${faces(r.code, 5)}</div><button class="btn small" data-act="copy">${t('copy')}</button></div>
       <h3>${t('players')} ${r.members.length}/6</h3><div class="mems">${members}</div>${chars ? `<label class="lab">${t('mychar')}${chars}</label>` : ''}
       <h3>${t('pick_dun')}</h3><div class="duns row3">${duns}</div>

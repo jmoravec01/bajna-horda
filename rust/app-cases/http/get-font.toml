@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/fonts/PixelifySans.woff2"
+path = "/fonts/Jersey15.woff2"
 
 [response]
 status = 200
