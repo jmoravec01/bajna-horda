@@ -182,7 +182,7 @@ export class Run {
       switch (v[0]) {
         case 'h': sfx('hit'); break; case 'd': sfx(v[3] ? 'boom' : 'kill'); break; case 'g': sfx('gem'); break; case '$': sfx('coin'); break; case '+': sfx('heart'); break;
         case 'L': case 'C': sfx('level'); break; case 'u': sfx('hurt'); break; case 'x': sfx('die'); break;
-        case 'B': { sfx('boss'); const b = this.dunData.boss, n = this.dunData.stages.length; this.toast(`${t('boss')} ${v[1] || n}/${n} · ${nm({ cs: b.name_cs, en: b.name_en })}`); break; }
+        case 'B': { sfx('boss'); const n = this.dunData.stages.length, k = v[1] || n; this.bossName = this.dunData.boss.names[k - 1]; this.toast(`${t('boss')} ${k}/${n} · ${this.bossName}`); break; }
         case 'S': sfx(v[2] ? 'level' : 'boss'); this.toast(`${t(v[2] ? 'shrine_on' : 'shrine_lost')} · ${snap.sh.filter((h) => h[3]).length}/${snap.sh.length}`); break;
         case 'b': sfx('boom'); break; case 'c': sfx('zap'); break; case 'r': case 'M': sfx('pulse'); break;
       }
@@ -203,7 +203,7 @@ export class Run {
     set('hp', '.hpbar i', Math.round(me[3] / me[4] * 100), (e, v) => { e.style.width = v + '%'; });
     set('hpt', '.hpbar b', me[3] + '/' + me[4], (e, v) => { e.textContent = v; });
     set('boss', '.bossbar', m.boss, (e, v) => { e.classList.toggle('on', v > 0); e.querySelector('i').style.width = v + '%'; });
-    set('shield', '.bossbar', !!m.shield, (e, v) => { e.classList.toggle('shield', v); e.querySelector('b').textContent = v ? t('shield') : t('boss'); });
+    set('shield', '.bossbar', `${!!m.shield}${this.bossName}`, (e) => { e.classList.toggle('shield', !!m.shield); e.querySelector('b').textContent = m.shield ? t('shield') : this.bossName || t('boss'); });
     if (snap.sh) set('shr', '.shr', snap.sh.filter((h) => h[3]).length, (e, v) => { e.textContent = `⚑ ${v}/${snap.sh.length}`; });
     if (m.dead && snap.p.length > 1) this.toast(t('revive'));
     this.levelCards(m);

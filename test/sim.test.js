@@ -177,3 +177,8 @@ test('team dungeons: 10-minute runs with three shielded bosses, the raid is a mu
   const raid = DUNGEON.r1; assert.ok(raid.raid && raid.shrines === 4 && raid.diff > 1.5 * DUNGEON.m3.diff && raid.spawn > DUNGEON.m3.spawn);
   assert.equal(DUNGEONS.multi.at(-1), raid);                                                  // opens after the last ordinary one
 });
+
+test('every boss has its own Czech first name, three per dungeon', () => {
+  const all = Object.values(DUNGEON).flatMap((d) => { assert.equal(d.boss.names.length, d.stages.length); return d.boss.names; });
+  assert.equal(new Set(all).size, 21); assert.ok(all.every((n) => /^\p{Lu}\p{L}+$/u.test(n)));
+});
