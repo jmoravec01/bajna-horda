@@ -27,12 +27,12 @@ function tone(freq, dur, type = 'square', vol = 0.2, slide = 0, delay = 0, dest)
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   o.connect(g); g.connect(dest || master); o.start(t); o.stop(t + dur + 0.02);
 }
-function noise(dur, vol = 0.2, hp = 800) {
+function noise(dur, vol = 0.2, hp = 800, dest, delay = 0) {
   const c = ctx; if (!c || c.state !== 'running') return;
   const n = Math.floor(c.sampleRate * dur), b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
   const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-  s.buffer = b; f.type = 'highpass'; f.frequency.value = hp; g.gain.value = vol; s.connect(f); f.connect(g); g.connect(master); s.start();
+  s.buffer = b; f.type = 'highpass'; f.frequency.value = hp; g.gain.value = vol; s.connect(f); f.connect(g); g.connect(dest || master); s.start(ctx.currentTime + delay);
 }
 const SFX = {
   hit: () => tone(220, 0.05, 'square', 0.07, -80),
@@ -73,3 +73,38 @@ function startMusic() { clearInterval(timer); step = 0; const t = TRACKS[want]; 
 export function music(name) { if (name === want) return; want = name; clearInterval(timer); if (ctx && ctx.state === 'running' && name) startMusic(); }
 export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; }
 export const isMuted = () => muted;
+
+// every boss has its own voice: [oscillator steps [freq, dur, wave, vol, slide, delay]..., noise [dur, vol, highpass, delay]]. Small (mid-run) bosses sound higher and lighter than the last one.
+const VOICE = {
+  fox: { t: [[900, .08, 'square', .2, -300, 0], [1100, .08, 'square', .2, -400, .12], [1300, .14, 'square', .2, -600, .24]] },
+  boar: { t: [[110, .2, 'sawtooth', .3, -30, 0], [90, .25, 'sawtooth', .3, -20, .22]], n: [.15, .1, 300, 0] },
+  tur: { t: [[70, .8, 'sawtooth', .35, 25, 0], [75, .8, 'square', .2, 0, .02]], n: [.5, .1, 200, 0] },
+  havran: { t: [[700, .1, 'sawtooth', .2, -200, 0], [650, .1, 'sawtooth', .2, -200, .14], [600, .16, 'sawtooth', .2, -250, .28]], n: [.4, .06, 1500, 0] },
+  zmije: { n: [.8, .2, 3000, 0] },
+  kun: { t: [[420, .15, 'sawtooth', .22, 500, 0], [900, .45, 'sawtooth', .2, -500, .15], [200, .5, 'sine', .15, 0, 0]] },
+  mlok: { t: [[300, .45, 'sawtooth', .1, -100, 0]], n: [.55, .2, 1500, 0] },
+  kohout: { t: [[600, .1, 'square', .2, 0, 0], [800, .1, 'square', .2, 0, .12], [700, .1, 'square', .2, 0, .24], [900, .38, 'square', .2, -300, .36]] },
+  zarptak: { t: [[1200, .5, 'sine', .2, 800, 0], [1800, .45, 'triangle', .15, -800, .3]], n: [.5, .08, 3000, .1] },
+  netopyr: { t: [[2400, .05, 'sine', .14, 500, 0], [2600, .05, 'sine', .14, 500, .08], [2800, .05, 'sine', .14, 500, .16], [3000, .08, 'sine', .14, 400, .24]] },
+  rys: { t: [[500, .45, 'sawtooth', .2, 300, 0], [450, .3, 'sawtooth', .15, 200, .02]] },
+  medved: { t: [[85, .9, 'sawtooth', .35, -20, 0], [130, .9, 'square', .15, -60, 0]], n: [.8, .12, 150, 0] },
+  zaba: { t: [[180, .08, 'square', .25, 60, 0], [220, .08, 'square', .25, 0, .1], [170, .16, 'square', .25, -30, .2]] },
+  vydra: { t: [[1400, .06, 'triangle', .2, 300, 0], [1600, .06, 'triangle', .2, 300, .1], [1800, .1, 'triangle', .2, 200, .2]] },
+  stika: { t: [[300, .1, 'sine', .3, 400, 0], [400, .1, 'sine', .3, 400, .12], [500, .1, 'sine', .3, 400, .24], [250, .2, 'sine', .3, 300, .36]] },
+  hranostaj: { t: [0, 1, 2, 3, 4, 5].map((i) => [2000 + (i % 2) * 300, .04, 'square', .12, 0, i * .07]) },
+  vlk: { t: [[300, 1.1, 'sine', .28, 260, 0], [305, 1.1, 'triangle', .12, 260, 0]] },
+  mamut: { t: [[220, .9, 'sawtooth', .3, 120, 0], [330, .9, 'square', .15, 100, 0]], n: [.5, .06, 600, .1] },
+  kocour: { t: [[500, .3, 'triangle', .25, 300, 0], [800, .38, 'triangle', .25, -400, .28]] },
+  sova: { t: [[330, .25, 'sine', .35, -40, 0], [300, .45, 'sine', .35, -40, .4]] },
+  drak: { t: [[60, 1.1, 'sawtooth', .4, 40, 0], [120, 1.1, 'sawtooth', .25, -60, .05]], n: [1, .18, 200, .1] },
+};
+// vol 0..1 (distance), pan -1..1, semi: a smaller boss (higher, lighter)
+export function roar(design, semi = false, vol = 1, pan = 0) {
+  const c = ctx, v = VOICE[design]; if (!c || c.state !== 'running' || !v) return;
+  const bus = c.createGain(); bus.gain.value = vol * (semi ? 0.75 : 1);
+  let out = bus; if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; bus.connect(p); out = p; }
+  out.connect(master); setTimeout(() => bus.disconnect(), 2500);
+  const m = semi ? 1.35 : 1;
+  for (const [f, d, w, g, sl, dl] of v.t || []) tone(f * m, d, w, g, sl * m, dl, bus);
+  if (v.n) noise(v.n[0], v.n[1], v.n[2] * m, bus, v.n[3]);
+}

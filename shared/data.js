@@ -9,15 +9,15 @@ export const PACE = 1.1;             // the difficulty curves were tuned for 8 m
 export const BOSS_STAGES = [
   { at: 60,  hp: 0.05, dmg: 0.5,  size: 0.6, ring: 6,  minions: 2, every: 12 },
   { at: 180, hp: 0.25, dmg: 0.7,  size: 0.8, ring: 9,  minions: 4, every: 10 },
-  { at: 300, hp: 0.7,  dmg: 1,    size: 1,   ring: 14, minions: 6, every: 8 },
+  { at: 300, hp: 0.7,  dmg: 1,    size: 1.3, ring: 14, minions: 6, every: 8 },
 ];
-// every boss has its own Czech first name, from old ones (Bořivoj) to new ones (Jakub), in the order a player meets them
+// every boss has its own Czech first name and its own animal (public/js/bosses.js), from old ones (Bořivoj) to new ones (Jakub), in the order a player meets them
 // team runs (multiplayer and the raid) last 10 minutes: bosses at 2:00, 5:30 and 9:00, and each one is shielded until enough shrines are held
 export const TEAM_SECONDS = 600;
 export const TEAM_STAGES = [
   { at: 120, hp: 0.10, dmg: 0.5, size: 0.6, ring: 8,  minions: 3, every: 12 },
   { at: 330, hp: 0.40, dmg: 0.7, size: 0.8, ring: 11, minions: 5, every: 10 },
-  { at: 540, hp: 1.00, dmg: 1,   size: 1,   ring: 16, minions: 8, every: 8 },
+  { at: 540, hp: 1.00, dmg: 1,   size: 1.3, ring: 16, minions: 8, every: 8 },
 ];
 export const MAX_LEVEL = 100;
 export const MAX_WEAPONS = 5, MAX_PASSIVES = 5, MAX_ITEM_LVL = 8;
@@ -104,28 +104,28 @@ export const DUNGEONS = {
   single: [
     dun({ id: 's1', mode: 'single', cs: 'Louka', en: 'Meadow', diff: 1.0, xp: 1, bg: ['#3d7a3a', '#356d33', '#4f8f45', '#2d5e2b'], deco: 'grass',
       roster: [['slime', ['#6fd45a', '#2c7a22', '#fff'], 0, 6], ['bat', ['#8b5a3c', '#4a2c18', '#e33'], 40, 3], ['wolf', ['#8a8f99', '#4a4f59', '#ee5'], 100, 3], ['boar', ['#7a4a2a', '#3a2010', '#fff'], 190, 2], ['ogre', ['#6a9a5a', '#2d4a24', '#ee5'], 280, 1]],
-      elite: ['ogre', ['#c05a3a', '#5a2a1a', '#ff0']], boss: { arch: 'ogre', pal: ['#d4a017', '#6b4a05', '#f33'], names: ['Bořivoj', 'Spytihněv', 'Vratislav'], hp: 1800 } }),
+      elite: ['ogre', ['#c05a3a', '#5a2a1a', '#ff0']], boss: { arch: 'ogre', pal: ['#d4a017', '#6b4a05', '#f33'], names: ['Bořivoj', 'Spytihněv', 'Vratislav'], designs: ['fox', 'boar', 'tur'], hp: 1800 } }),
     dun({ id: 's2', mode: 'single', cs: 'Krypta', en: 'Crypt', diff: 1.35, xp: 1.3, bg: ['#3a3548', '#322d40', '#46405a', '#2a2636'], deco: 'bones',
       roster: [['skel', ['#e8e4d0', '#8a8670', '#e33'], 0, 6], ['bat', ['#5a4a7a', '#2a2040', '#8ef'], 30, 3], ['ghost', ['#b8d8f0', '#5a7a9a', '#fff'], 90, 3], ['spider', ['#4a3a4a', '#1a101a', '#e3e'], 170, 2], ['ogre', ['#8a7a9a', '#3a2a4a', '#8ef'], 270, 1]],
-      elite: ['ogre', ['#6a6a8a', '#2a2a4a', '#ff0']], boss: { arch: 'skel', pal: ['#c8b8f0', '#4a3a7a', '#f3f'], names: ['Soběslav', 'Ctibor', 'Vladislav'], hp: 2600, scale: 3 } }),
+      elite: ['ogre', ['#6a6a8a', '#2a2a4a', '#ff0']], boss: { arch: 'skel', pal: ['#c8b8f0', '#4a3a7a', '#f3f'], names: ['Soběslav', 'Ctibor', 'Vladislav'], designs: ['havran', 'zmije', 'kun'], hp: 2600, scale: 3 } }),
     dun({ id: 's3', mode: 'single', cs: 'Sopka', en: 'Volcano', diff: 1.8, xp: 1.7, bg: ['#4a2a22', '#3e2019', '#5c3328', '#2e1812'], deco: 'lava',
       roster: [['imp', ['#e8502a', '#7a1a0a', '#ff0'], 0, 6], ['bat', ['#8a2a1a', '#3a0a05', '#fa0'], 30, 3], ['wolf', ['#3a2a2a', '#150a0a', '#f80'], 90, 3], ['boar', ['#b03a1a', '#4a1008', '#fd0'], 170, 2], ['ogre', ['#5a3a3a', '#1a0f0f', '#f60'], 260, 1]],
-      elite: ['ogre', ['#e8502a', '#5a1005', '#ff0']], boss: { arch: 'ogre', pal: ['#f0a020', '#7a2005', '#fff'], names: ['Bohuslav', 'Václav', 'Jindřich'], hp: 3600, scale: 2.6 } }),
+      elite: ['ogre', ['#e8502a', '#5a1005', '#ff0']], boss: { arch: 'ogre', pal: ['#f0a020', '#7a2005', '#fff'], names: ['Bohuslav', 'Václav', 'Jindřich'], designs: ['mlok', 'kohout', 'zarptak'], hp: 3600, scale: 2.6 } }),
   ],
   multi: [
     dun({ id: 'm1', mode: 'multi', cs: 'Jeskyně', en: 'Cave', diff: 1.2, xp: 1.2, bg: ['#4a4038', '#3e362f', '#574c42', '#2f2a25'], deco: 'rocks',
       roster: [['slime', ['#c8a050', '#6a4a1a', '#fff'], 0, 6], ['bat', ['#6a5a7a', '#2a2038', '#f66'], 20, 4], ['spider', ['#3a3a3a', '#111', '#f33'], 70, 3], ['wolf', ['#7a6a5a', '#3a2f26', '#ee5'], 140, 3], ['ogre', ['#8a7a6a', '#3a2a1a', '#ee5'], 240, 1.5]],
-      elite: ['ogre', ['#7a5a3a', '#2a1a0a', '#ff0']], boss: { arch: 'spider', pal: ['#7a6a8a', '#2a1a3a', '#f33'], names: ['Vojtěch', 'Jaroslav', 'Josef'], hp: 3200, scale: 3.4 } }),
+      elite: ['ogre', ['#7a5a3a', '#2a1a0a', '#ff0']], boss: { arch: 'spider', pal: ['#7a6a8a', '#2a1a3a', '#f33'], names: ['Vojtěch', 'Jaroslav', 'Josef'], designs: ['netopyr', 'rys', 'medved'], hp: 3200, scale: 3.4 } }),
     dun({ id: 'm2', mode: 'multi', cs: 'Bažina', en: 'Swamp', diff: 1.5, xp: 1.5, bg: ['#3a4a2e', '#324027', '#465a37', '#2a3820'], deco: 'reeds',
       roster: [['slime', ['#7a9a3a', '#2a4a10', '#ff0'], 0, 6], ['ghost', ['#a0e0a0', '#4a8a5a', '#fff'], 30, 3], ['spider', ['#4a6a3a', '#1a2a10', '#ee3'], 80, 3], ['boar', ['#5a6a3a', '#2a3a1a', '#fff'], 150, 2.5], ['ogre', ['#4a6a4a', '#1a2a1a', '#ee5'], 250, 1.5]],
-      elite: ['ogre', ['#3a8a6a', '#0a3a2a', '#ff0']], boss: { arch: 'slime', pal: ['#5ad07a', '#106a2a', '#f33'], names: ['František', 'Antonín', 'Karel'], hp: 4200, scale: 3.6 } }),
+      elite: ['ogre', ['#3a8a6a', '#0a3a2a', '#ff0']], boss: { arch: 'slime', pal: ['#5ad07a', '#106a2a', '#f33'], names: ['František', 'Antonín', 'Karel'], designs: ['zaba', 'vydra', 'stika'], hp: 4200, scale: 3.6 } }),
     dun({ id: 'm3', mode: 'multi', cs: 'Ledovec', en: 'Glacier', diff: 1.9, xp: 2, bg: ['#a8c8d8', '#9abccc', '#b8d6e4', '#88aabb'], deco: 'ice',
       roster: [['imp', ['#6ac8f0', '#1a5a8a', '#fff'], 0, 6], ['wolf', ['#e8f0f8', '#8aa0b0', '#38f'], 25, 4], ['ghost', ['#d0e8ff', '#7a9ac0', '#fff'], 80, 3], ['boar', ['#b8d0e0', '#5a7a90', '#fff'], 150, 2.5], ['ogre', ['#9ac0d8', '#3a5a78', '#fff'], 240, 1.5]],
-      elite: ['ogre', ['#6aa0d8', '#1a3a6a', '#ff0']], boss: { arch: 'ogre', pal: ['#ffffff', '#5a8ab0', '#38f'], names: ['Emil', 'Jiří', 'Pavel'], hp: 5200, scale: 2.8 } }),
+      elite: ['ogre', ['#6aa0d8', '#1a3a6a', '#ff0']], boss: { arch: 'ogre', pal: ['#ffffff', '#5a8ab0', '#38f'], names: ['Emil', 'Jiří', 'Pavel'], designs: ['hranostaj', 'vlk', 'mamut'], hp: 5200, scale: 2.8 } }),
     // the raid: shaped like a multiplayer dungeon, several times harder (stronger enemies, faster waves, four shrines); open once Glacier is cleared
     dun({ id: 'r1', mode: 'multi', raid: true, cs: 'Navia', en: 'Navia', diff: 3.2, xp: 4, spawn: 1.45, pace: 1.0, shrines: 4, bg: ['#2a1f3a', '#241a32', '#34274a', '#1a1226'], deco: 'bones',
       roster: [['ghost', ['#c8a8ff', '#5a3a8a', '#fff'], 0, 5], ['imp', ['#9a3ad8', '#3a0a5a', '#ff0'], 0, 4], ['wolf', ['#3a2a4a', '#0e0816', '#f3f'], 40, 3], ['spider', ['#5a2a6a', '#1a0a22', '#f6f'], 90, 3], ['boar', ['#4a2a5a', '#160a1e', '#fff'], 150, 2.5], ['ogre', ['#6a3a8a', '#1e0a2e', '#fd0'], 220, 1.5]],
-      elite: ['ogre', ['#8a3ac8', '#2a0a44', '#ff0']], boss: { arch: 'ogre', pal: ['#b020f0', '#2a0640', '#ff3'], names: ['Martin', 'Tomáš', 'Jakub'], hp: 9000, scale: 3.4 } }),
+      elite: ['ogre', ['#8a3ac8', '#2a0a44', '#ff0']], boss: { arch: 'ogre', pal: ['#b020f0', '#2a0640', '#ff3'], names: ['Martin', 'Tomáš', 'Jakub'], designs: ['kocour', 'sova', 'drak'], hp: 9000, scale: 3.4 } }),
   ],
 };
 export const DUNGEON = Object.fromEntries([...DUNGEONS.single, ...DUNGEONS.multi].map((d) => [d.id, d]));

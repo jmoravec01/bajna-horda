@@ -3,7 +3,7 @@ import { Sim, weaponStats } from '../shared/sim.js';
 import { DT, DUNGEON, WEAPONS, PASSIVE, WEAPON_IDX } from '../shared/data.js';
 import { Scene, render } from './render.js';
 import { objSprite, passiveSprite, text } from './sprites.js';
-import { sfx, music } from './audio.js';
+import { sfx, music, roar } from './audio.js';
 import { t, nm, dd } from './i18n.js';
 
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -47,7 +47,7 @@ export class Run {
     this.dunData = DUNGEON[this.dun];
     this.scene = new Scene(this.dunData, this.meId, this.players);
     this.dir = [0, 0]; this.keys = new Set(); this.touch = null; this.paused = false; this.ended = false;
-    this.lastHud = {}; this.picked = null; this.lastSend = 0; this.sentDir = [9, 9]; this.pp = null; this.acc = 0; this.prevT = 0; this.shown = null;
+    this.lastHud = {}; this.callAt = {}; this.picked = null; this.lastSend = 0; this.sentDir = [9, 9]; this.pp = null; this.acc = 0; this.prevT = 0; this.shown = null;
   }
 
   start() {
@@ -174,7 +174,7 @@ export class Run {
 
   push(snap, now = performance.now()) {            // from the sim (single) or the server (co-op)
     this.scene.push(snap, now);
-    this.events(snap); this.updateHud(snap);
+    this.events(snap); this.updateHud(snap); this.bossCalls(snap, now);
   }
 
   events(snap) {
@@ -182,10 +182,20 @@ export class Run {
       switch (v[0]) {
         case 'h': sfx('hit'); break; case 'd': sfx(v[3] ? 'boom' : 'kill'); break; case 'g': sfx('gem'); break; case '$': sfx('coin'); break; case '+': sfx('heart'); break;
         case 'L': case 'C': sfx('level'); break; case 'u': sfx('hurt'); break; case 'x': sfx('die'); break;
-        case 'B': { sfx('boss'); const n = this.dunData.stages.length, k = v[1] || n; this.bossName = this.dunData.boss.names[k - 1]; this.toast(`${t('boss')} ${k}/${n} · ${this.bossName}`); break; }
+        case 'B': { const n = this.dunData.stages.length, k = v[1] || n; sfx('boss'); this.callAt[k] = performance.now(); roar(this.dunData.boss.designs[k - 1], k < n); this.bossName = this.dunData.boss.names[k - 1]; this.toast(`${t('boss')} ${k}/${n} · ${this.bossName}`); break; }
         case 'S': sfx(v[2] ? 'level' : 'boss'); this.toast(`${t(v[2] ? 'shrine_on' : 'shrine_lost')} · ${snap.sh.filter((h) => h[3]).length}/${snap.sh.length}`); break;
         case 'b': sfx('boom'); break; case 'c': sfx('zap'); break; case 'r': case 'M': sfx('pulse'); break;
       }
+    }
+  }
+  // a boss calls out now and then, louder the closer it is and from the side it is on, so you can tell which one is near without looking
+  bossCalls(snap, now) {
+    const me = snap.p.find((p) => p[0] === this.meId) || snap.p[0], n = this.dunData.stages.length;
+    for (const e of snap.e) {
+      if (e[1] < 6 || !me) continue;
+      const k = e[1] - 5, last = this.callAt[k] || 0; if (now - last < (k < n ? 7000 : 5500)) continue;
+      const dx = e[2] - me[1], dy = e[3] - me[2], dist = Math.hypot(dx, dy);
+      this.callAt[k] = now; roar(this.dunData.boss.designs[k - 1], k < n, Math.max(0.12, 0.6 - dist / 400), Math.max(-1, Math.min(1, dx / 90)));
     }
   }
   toast(s) { const e = this.q('.toast'); if (!e || !s) return; e.textContent = s; e.classList.remove('show'); void e.offsetWidth; e.classList.add('show'); }

@@ -15,7 +15,7 @@ function outline(c, col = OUT) {
   x.putImageData(im, 0, 0);
   return c;
 }
-function make(w, h, fn, noOutline) {
+export function make(w, h, fn, noOutline) {
   const c = mk(w + 2, h + 2), x = c.getContext('2d');
   x.translate(1, 1); fn(x, w, h);
   return noOutline ? c : outline(c);

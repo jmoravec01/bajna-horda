@@ -305,6 +305,13 @@ impl Sim {
         else if r < 0.125 + 0.012 * luck { self.drop(x, y, 5, 0.0); }
     }
     fn drop(&mut self, x: f64, y: f64, tier: u8, v: f64) {
+        // xp gems and coins that land next to one of the last few drops fuse into it (same xp in total, fewer sprites, events and bytes per snapshot)
+        if tier <= 3 {
+            if let Some(g) = self.picks.iter_mut().rev().take(40).find(|g| !g.mag && g.tier <= 3 && (g.tier == 3) == (tier == 3) && dist2(g.x, g.y, x, y) < 49.0) {
+                g.v += v; if g.tier < 3 { g.tier = if g.v < 3.0 { 0 } else if g.v < 8.0 { 1 } else { 2 }; }
+                return;
+            }
+        }
         let id = self.nid; self.nid += 1;
         self.picks.push(Pick { id, tier, x, y, v, mag: false });
     }
@@ -1048,6 +1055,14 @@ mod tests {
         for (g, w) in got.iter().zip(want) { assert!((g - w).abs() < 1e-15, "{got:?}"); }
     }
 
+    #[test]
+    fn gems_and_coins_that_land_together_fuse() {
+        let mut sim = Sim::new(5, "s1", vec![input("bohatyr", 1)]);
+        sim.picks.clear();
+        sim.drop(100.0, 100.0, 0, 1.0); sim.drop(103.0, 101.0, 0, 1.0); sim.drop(101.0, 99.0, 0, 1.0); sim.drop(300.0, 300.0, 0, 1.0); sim.drop(100.0, 100.0, 3, 1.0); sim.drop(100.0, 100.0, 4, 0.0);
+        assert_eq!(sim.picks.len(), 4);
+        assert_eq!((sim.picks[0].v, sim.picks[0].tier), (3.0, 1));
+    }
     #[test]
     fn every_class_and_dungeon_runs() {
         for d in &data().dungeons { for c in &data().classes {

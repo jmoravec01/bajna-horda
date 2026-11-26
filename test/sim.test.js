@@ -182,3 +182,19 @@ test('every boss has its own Czech first name, three per dungeon', () => {
   const all = Object.values(DUNGEON).flatMap((d) => { assert.equal(d.boss.names.length, d.stages.length); return d.boss.names; });
   assert.equal(new Set(all).size, 21); assert.ok(all.every((n) => /^\p{Lu}\p{L}+$/u.test(n)));
 });
+
+test('every boss has its own animal design', async () => {
+  const { BOSS_DESIGNS } = { BOSS_DESIGNS: [...(await import('node:fs')).readFileSync(new URL('../public/js/bosses.js', import.meta.url), 'utf8').matchAll(/^  (\w+): \[\[/gm)].map((m) => m[1]) };
+  const all = Object.values(DUNGEON).flatMap((d) => d.boss.designs);
+  assert.equal(all.length, 21); assert.equal(new Set(all).size, 21);
+  for (const id of all) assert.ok(BOSS_DESIGNS.includes(id), id);
+});
+
+test('gems and coins that land together fuse into one pickup with the same total', () => {
+  const sim = new Sim({ seed: 5, dungeonId: 's1', players: [ch('bohatyr')] });
+  sim.picks = [];
+  sim.drop(100, 100, 0, 1); sim.drop(103, 101, 0, 1); sim.drop(101, 99, 0, 1); sim.drop(300, 300, 0, 1); sim.drop(100, 100, 3, 1); sim.drop(100, 100, 4, 0);
+  assert.equal(sim.picks.length, 4);
+  assert.equal(sim.picks[0].v, 3); assert.equal(sim.picks[0].tier, 1);
+  assert.equal(sim.picks.reduce((n, g) => n + (g.tier <= 2 ? g.v : 0), 0), 4);
+});

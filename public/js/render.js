@@ -1,17 +1,18 @@
 // Scene: interpolates between two snapshots. Renderer: draws one frame onto the small pixel canvas.
 import { DUNGEON, ARCH, CLASS, WEAPONS } from '../shared/data.js';
+import { bossSprite } from './bosses.js';
 import { armSprite, armGlow, heroSkin, heroSprite, enemySprite, enemyRadius, enemyFor, objSprite, pickSprite, bulletSprite, ground, text, textWidth } from './sprites.js';
 
 export class Scene {
   constructor(dun, meId, players) {
     this.dun = dun; this.meId = meId; this.players = players;     // players: [{id, name, cls}]
-    this.cur = null; this.prev = null; this.pm = { e: new Map(), o: new Map(), p: new Map() };
+    this.cur = null; this.prev = null; this.pm = { e: new Map(), o: new Map(), p: new Map(), g: new Map() };
     this.tCur = 0; this.interval = 100; this.fx = []; this.atk = new Map(); this.cam = [0, 0];
   }
   push(snap, now) {
     if (this.cur) {
       this.interval = Math.min(250, Math.max(40, this.interval * 0.8 + (now - this.tCur) * 0.2));
-      this.pm.e = new Map(this.cur.e.map((a) => [a[0], a])); this.pm.o = new Map(this.cur.o.map((a) => [a[0], a])); this.pm.p = new Map(this.cur.p.map((a) => [a[0], a]));
+      this.pm.e = new Map(this.cur.e.map((a) => [a[0], a])); this.pm.o = new Map(this.cur.o.map((a) => [a[0], a])); this.pm.p = new Map(this.cur.p.map((a) => [a[0], a])); this.pm.g = new Map(this.cur.g.map((a) => [a[0], a]));
     }
     this.prev = this.cur; this.cur = snap; this.tCur = now;
     for (const v of snap.v) this.addFx(v, now);
@@ -155,8 +156,8 @@ export function render(ctx, W, H, sc, now, lastDir) {
   // pickups
   for (const g of c.g) {
     if (!vis(g[2], g[3])) continue;
-    const s = pickSprite(g[1]), bob = Math.round(Math.sin(now / 250 + g[0]) * 1);
-    ctx.drawImage(s, sx(g[2]) - (s.width >> 1), sy(g[3]) - (s.height >> 1) + bob);
+    const s = pickSprite(g[1]), bob = Math.round(Math.sin(now / 250 + g[0]) * 1), q = sc.pm.g.get(g[0]);
+    ctx.drawImage(s, sx(q ? lerp(q[2], g[2], a) : g[2]) - (s.width >> 1), sy(q ? lerp(q[3], g[3], a) : g[3]) - (s.height >> 1) + bob);
   }
 
   // sortable things: enemies + players
@@ -174,20 +175,21 @@ export function render(ctx, W, H, sc, now, lastDir) {
   list.sort((u, v) => u[0] - v[0]);
   for (const [, kind, e, x, y, dxm] of list) {
     if (kind === 0) {
-      const [arch, pal] = enemyFor(d, e[1]), fr = enemySprite(arch, pal), spr = fr[(Math.floor(now / 220) + e[0]) & 1], r = enemyRadius(d, e[1]);
-      const k = r / ARCH[arch].r, w = Math.round(spr.width * k), h = Math.round(spr.height * k);
+      const boss = e[1] >= 6, [arch, pal] = enemyFor(d, e[1]), fr = boss ? bossSprite(d.boss.designs[e[1] - 6]) : enemySprite(arch, pal), spr = fr[(Math.floor(now / 220) + e[0]) & 1], r = enemyRadius(d, e[1]);
+      const k = boss ? r * 2.1 / spr.width : r / ARCH[arch].r, w = Math.round(spr.width * k), h = Math.round(spr.height * k);
+      if (boss && e[1] === 5 + d.stages.length) { const cy = sy(y), rr = Math.round(r * 1.15); disc(ctx, sx(x), cy, rr, '#ff3030', 0.14 + 0.06 * Math.sin(now / 250)); ring(ctx, sx(x), cy, rr, '#ff6a4a', 0.8); }       // the last boss of a dungeon wears an aura
       const px = sx(x), py = sy(y);
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(px - (w >> 1) + 1, py + (h >> 1) - 1, w - 2, 2);
       let img = spr; const fl = e[5];
       if (fl & 1) img = tinted(spr, '#ffffff'); else if (fl & 2) img = tinted(spr, '#9fe8ff'); else if ((fl & 4) && (now / 120 | 0) % 2) img = tinted(spr, '#ff8a30');
       ctx.save();
-      ctx.translate(px, py - (h >> 1));
+      ctx.translate(px, py - (boss ? 0 : h >> 1));          // a boss is drawn around its hit circle, the small ones stand on it
       if (dxm < -0.05) ctx.scale(-1, 1);
       if (arch === 'ghost') ctx.globalAlpha = 0.75;
       ctx.drawImage(img, -(w >> 1), -(h >> 1), w, h);
       ctx.restore();
-      if (fl & 16) { const rr = (Math.max(w, h) >> 1) + 3, cy = py - (h >> 1); disc(ctx, px, cy, rr, '#7ad8ff', 0.18); ring(ctx, px, cy, rr, '#bfeaff', 0.5 + 0.3 * Math.sin(now / 200)); }       // a shielded boss
-      if (e[1] >= 5) { const bw = Math.max(14, w); ctx.fillStyle = '#000'; ctx.fillRect(px - (bw >> 1) - 1, py - h - 4, bw + 2, 4); ctx.fillStyle = e[1] >= 6 ? '#e33' : '#f90'; ctx.fillRect(px - (bw >> 1), py - h - 3, Math.round(bw * e[4] / 100), 2); }
+      if (fl & 16) { const rr = (Math.max(w, h) >> 1) + 3, cy = py - (boss ? 0 : h >> 1); disc(ctx, px, cy, rr, '#7ad8ff', 0.18); ring(ctx, px, cy, rr, '#bfeaff', 0.5 + 0.3 * Math.sin(now / 200)); }       // a shielded boss
+      if (e[1] >= 5) { const bw = Math.max(14, w), hb = boss ? (h >> 1) + 3 : h; ctx.fillStyle = '#000'; ctx.fillRect(px - (bw >> 1) - 1, py - hb - 4, bw + 2, 4); ctx.fillStyle = e[1] >= 6 ? '#e33' : '#f90'; ctx.fillRect(px - (bw >> 1), py - hb - 3, Math.round(bw * e[4] / 100), 2); }
     } else {
       const pl = sc.players.find((q) => q.id === e[0]) || { cls: 'bohatyr', name: '?' };
       const arm = pl.arm && armSprite(pl.arm) ? { s: armSprite(pl.arm), plus: pl.plus || 0 } : null, moving = e[0] === sc.meId ? lastDir : 1, fr = (moving && !e[5]) ? (Math.floor(now / 140) & 1) : 0, spr = heroSprite(pl.cls, fr);

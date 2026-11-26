@@ -151,7 +151,18 @@ export class Sim {
     else if (r < 0.10 + 0.012 * (owner.cl.heartLuck || 1)) this.drop(e.x, e.y, 4, 0);
     else if (r < 0.125 + 0.012 * (owner.cl.heartLuck || 1)) this.drop(e.x, e.y, 5, 0);
   }
-  drop(x, y, tier, v) { this.picks.push({ id: this.nid++, tier, x, y, v, mag: false }); }
+  drop(x, y, tier, v) {
+    // xp gems and coins that land next to one of the last few drops fuse into it (same xp in total, fewer sprites and events)
+    if (tier <= 3) {
+      for (let i = this.picks.length - 1; i >= 0 && i >= this.picks.length - 40; i--) {
+        const g = this.picks[i];
+        if (g.mag || g.tier > 3 || (g.tier === 3) !== (tier === 3) || (g.x - x) ** 2 + (g.y - y) ** 2 >= 49) continue;
+        g.v += v; if (g.tier < 3) g.tier = g.v < 3 ? 0 : g.v < 8 ? 1 : 2;
+        return;
+      }
+    }
+    this.picks.push({ id: this.nid++, tier, x, y, v, mag: false });
+  }
 
   hurtPlayer(p, dmg, fromX, fromY) {
     if (p.dead || p.inv > 0) return;
