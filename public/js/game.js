@@ -1,6 +1,6 @@
 // One run on screen: canvas, joystick, HUD, level-up cards. Single player steps its own Sim; co-op is fed snapshots by the server.
 import { Sim, weaponStats } from '../shared/sim.js';
-import { DT, DUNGEON, WEAPONS, PASSIVE, WEAPON_IDX, BOSS_STAGES, RUN_SECONDS } from '../shared/data.js';
+import { DT, DUNGEON, WEAPONS, PASSIVE, WEAPON_IDX } from '../shared/data.js';
 import { Scene, render } from './render.js';
 import { objSprite, passiveSprite, text } from './sprites.js';
 import { sfx, music } from './audio.js';
@@ -55,9 +55,9 @@ export class Run {
     r.innerHTML = `<div class="play"><canvas class="cv"></canvas>
       <div class="hud"><div class="xpbar"><i></i></div>
         <div class="toprow"><span class="lv"></span><span class="tm"></span><span class="bank"></span><button class="icon-btn pbtn" aria-label="${t('pause')}">II</button></div>
-        <div class="prog"><i></i>${BOSS_STAGES.map((b, n) => `<u class="b${n + 1}" style="left:${b.at / RUN_SECONDS * 100}%"></u>`).join('')}</div>
-        <div class="hpbar"><i></i><b></b></div><div class="kills"><span>${t('kills')}</span> <b>0</b></div><div class="bossbar"><i></i><b>${t('boss')}</b></div>
-        <div class="hint">${t('hint_move')}</div><div class="toast"></div></div>
+        <div class="prog"><i></i>${this.dunData.stages.map((b, n) => `<u class="b${n + 1}" style="left:${b.at / this.dunData.secs * 100}%"></u>`).join('')}</div>
+        <div class="hpbar"><i></i><b></b></div><div class="kills"><span>${t('kills')}</span> <b>0</b></div>${this.dunData.shrines ? '<div class="shr"></div>' : ''}<div class="bossbar"><i></i><b>${t('boss')}</b></div>
+        <div class="hint">${this.dunData.shrines ? t('hint_team') : t('hint_move')}</div><div class="toast"></div></div>
       <div class="stick"><div class="knob"></div></div>
       <div class="sheet lvlup" hidden></div><div class="sheet pausebox" hidden></div></div>`;
     this.q = (s) => r.querySelector(s);
@@ -69,7 +69,7 @@ export class Run {
       this.push(this.sim.snapshot(1));
     }
     this.raf = requestAnimationFrame((n) => this.frame(n));
-    setTimeout(() => this.q('.hint')?.classList.add('gone'), 6000);
+    setTimeout(() => this.q('.hint')?.classList.add('gone'), this.dunData.shrines ? 10000 : 6000);
   }
 
   bind() {
@@ -182,7 +182,8 @@ export class Run {
       switch (v[0]) {
         case 'h': sfx('hit'); break; case 'd': sfx(v[3] ? 'boom' : 'kill'); break; case 'g': sfx('gem'); break; case '$': sfx('coin'); break; case '+': sfx('heart'); break;
         case 'L': case 'C': sfx('level'); break; case 'u': sfx('hurt'); break; case 'x': sfx('die'); break;
-        case 'B': { sfx('boss'); const b = this.dunData.boss; this.toast(`${t('boss')} ${v[1] || BOSS_STAGES.length}/${BOSS_STAGES.length} · ${nm({ cs: b.name_cs, en: b.name_en })}`); break; }
+        case 'B': { sfx('boss'); const b = this.dunData.boss, n = this.dunData.stages.length; this.toast(`${t('boss')} ${v[1] || n}/${n} · ${nm({ cs: b.name_cs, en: b.name_en })}`); break; }
+        case 'S': sfx(v[2] ? 'level' : 'boss'); this.toast(`${t(v[2] ? 'shrine_on' : 'shrine_lost')} · ${snap.sh.filter((h) => h[3]).length}/${snap.sh.length}`); break;
         case 'b': sfx('boom'); break; case 'c': sfx('zap'); break; case 'r': case 'M': sfx('pulse'); break;
       }
     }
@@ -197,11 +198,13 @@ export class Run {
     set('tm', '.tm', Math.floor(snap.T), (e, v) => { e.textContent = fmtTime(v); });
     set('bank', '.bank', m.coins, (e, v) => { e.textContent = `${v} ◆`; });
     set('kills', '.kills b', m.kills, (e, v) => { e.textContent = v; });
-    set('pg', '.prog i', Math.min(100, Math.round(snap.T / RUN_SECONDS * 200) / 2), (e, v) => { e.style.width = v + '%'; });
-    set('pgb', '.prog', Math.floor(snap.T), (e, T) => { e.querySelectorAll('u').forEach((u, n) => u.classList.toggle('done', T >= BOSS_STAGES[n].at)); });
+    set('pg', '.prog i', Math.min(100, Math.round(snap.T / this.dunData.secs * 200) / 2), (e, v) => { e.style.width = v + '%'; });
+    set('pgb', '.prog', Math.floor(snap.T), (e, T) => { e.querySelectorAll('u').forEach((u, n) => u.classList.toggle('done', T >= this.dunData.stages[n].at)); });
     set('hp', '.hpbar i', Math.round(me[3] / me[4] * 100), (e, v) => { e.style.width = v + '%'; });
     set('hpt', '.hpbar b', me[3] + '/' + me[4], (e, v) => { e.textContent = v; });
     set('boss', '.bossbar', m.boss, (e, v) => { e.classList.toggle('on', v > 0); e.querySelector('i').style.width = v + '%'; });
+    set('shield', '.bossbar', !!m.shield, (e, v) => { e.classList.toggle('shield', v); e.querySelector('b').textContent = v ? t('shield') : t('boss'); });
+    if (snap.sh) set('shr', '.shr', snap.sh.filter((h) => h[3]).length, (e, v) => { e.textContent = `⚑ ${v}/${snap.sh.length}`; });
     if (m.dead && snap.p.length > 1) this.toast(t('revive'));
     this.levelCards(m);
   }

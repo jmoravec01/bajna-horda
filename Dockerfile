@@ -1,5 +1,4 @@
-# Production image: the Rust server (server-rs) + the static client. The Node server in server/ is the reference
-# implementation the Rust port is checked against; see Dockerfile.node for an image that runs it.
+# Production image: the Rust server (server-rs) + the static client.
 FROM rust:1-alpine AS build
 RUN apk add --no-cache build-base
 WORKDIR /src

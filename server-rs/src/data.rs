@@ -16,6 +16,7 @@ pub struct Consts {
     pub max_item_lvl: u32,
     pub max_equip: u32,
     pub max_plus: u32,
+    pub team_seconds: f64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -38,6 +39,7 @@ pub struct Arm {
     pub perk_val: f64,
     pub need: u32,
     pub price: i64,
+    pub legend: Option<String>,   // the dungeon whose chest drops it
 }
 
 // Class traits: a missing trait is 0, which behaves like the JS `cl.x || default`.
@@ -118,6 +120,12 @@ pub struct Dungeon {
     pub mode: String,
     pub diff: f64,
     pub xp: f64,
+    pub secs: f64,
+    pub shrines: usize,
+    pub pace: f64,
+    pub spawn: f64,
+    pub raid: bool,
+    pub stages: String,
     pub roster: Vec<RosterEntry>,
     pub elite: String,
     pub boss: BossDef,
@@ -133,8 +141,8 @@ pub struct Data {
     pub dungeons: Vec<Dungeon>,
     pub slots: Vec<String>,
     pub starter: String,
-    pub pace: f64,
-    pub boss_stages: Vec<BossStage>,
+    pub boss_stages: HashMap<String, Vec<BossStage>>,
+    pub legend_of: HashMap<String, String>,
     pub arms: Vec<Arm>,
 }
 
@@ -161,6 +169,9 @@ pub fn dungeon_index(d: &Dungeon) -> usize {
 }
 pub fn mode_len(mode: &str) -> usize {
     data().dungeons.iter().filter(|x| x.mode == mode).count()
+}
+impl Dungeon {
+    pub fn stages(&self) -> &'static [BossStage] { &data().boss_stages[&self.stages] }
 }
 pub fn or1(x: f64) -> f64 {
     if x == 0.0 { 1.0 } else { x }

@@ -1,6 +1,6 @@
 // Screens and navigation.
 import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS, ARMS, ARM, ARM_TYPES, MAX_PLUS } from '../shared/data.js';
-import { charStats, power, xpNeed, upgradeCost, unlocked, validName, armOf, armDmg, armUpCost } from '../shared/meta.js';
+import { charStats, power, xpNeed, upgradeCost, unlocked, validName, armOf, armDmg, armUpCost, armSell } from '../shared/meta.js';
 import { t, nm, ds, setLang, getLang, detectLang, errText } from './i18n.js';
 import { store, profile, Net, OFFLINE } from './net.js';
 import { Run } from './game.js';
@@ -10,8 +10,10 @@ import { sfx, music, setMuted, isMuted } from './audio.js';
 
 const $app = document.getElementById('app');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const REC = { s1: 100, s2: 190, s3: 300, m1: 130, m2: 230, m3: 340 };      // recommended power
-const S = { screen: 'title', run: null, net: null, room: null, pick: 'bohatyr', msg: '' };
+const REC = { s1: 100, s2: 190, s3: 300, m1: 130, m2: 230, m3: 340, r1: 600 };      // recommended power
+const S = { screen: 'title', run: null, net: null, room: null, pick: 'bohatyr', msg: '', chest: null, wantDun: null };
+const perkText = (w, pl) => { const v = w.perkVal * (1 + pl / MAX_PLUS), k = { hp: 1, spd: 0.5, cd: 1, magnet: 3 }[w.perk]; return w.perk ? `+${(v * k * 100).toFixed(1).replace('.0', '')} % ${t('perk_' + w.perk)}` : t('perk_none'); };
+const wTile = (id, plus = 0) => `<div class="atile t${ARM[id].tier}">${armCv(id, plus, 3)}<small>${esc(nm(ARM[id]))}</small></div>`;      // a weapon icon with its name
 
 const activeChar = () => profile.p?.chars.find((c) => c.id === store.d.active) || profile.p?.chars[0] || null;
 // a world is found by three hero faces; the wire code is 3 letters, A..L = the class index
@@ -89,6 +91,7 @@ const SCREENS = {
       <button class="btn big" data-go="single" ${c ? '' : 'disabled'}>${t('single')}</button>
       <button class="btn big alt" data-go="multi" ${c && !OFFLINE ? '' : 'disabled'}>${t('multi')}</button>
       <button class="btn big ghost" data-go="chars">${t('chars')} (${profile.p.chars.length}/${MAX_CHARS})</button>
+      <button class="btn ghost" data-go="inv" ${c ? '' : 'disabled'}>${t('inventory')}${(profile.p.bag || []).length ? ` · ${profile.p.bag.length}` : ''}</button>
       <button class="btn ghost small" data-act="logout">${t('logout')}</button></div>`, (root) => wire(root, async (e) => {
       if (e.target.closest('[data-act=logout]')) { await profile.logout(); go('title'); }
     }));
@@ -114,11 +117,11 @@ const SCREENS = {
   arms() {
     S.args = []; const p = profile.p, c = activeChar(); if (!c) return go('chars');
     const sel = ARM[S.armSel] || armOf(c)[0], has = c.arms[sel.id] !== undefined, plus = c.arms[sel.id] ?? 0, held = armOf(c)[0].id === sel.id;
-    const pr = (w, pl) => { const v = w.perkVal * (1 + pl / MAX_PLUS), k = { hp: 1, spd: 0.5, cd: 1, magnet: 3 }[w.perk]; return w.perk ? `+${(v * k * 100).toFixed(1).replace('.0', '')} % ${t('perk_' + w.perk)}` : t('perk_none'); };
+    const pr = perkText;
     const cost = armUpCost(sel, plus);
     const action = !has ? (c.level < sel.need ? `<button class="btn" disabled>${t('need_lvl')} ${sel.need}</button>` : `<button class="btn" data-op="buy" ${p.coins >= sel.price ? '' : 'disabled'}>${t('buy')} · ${sel.price} ◆</button>`)
       : `${plus >= MAX_PLUS ? `<span class="maxed">${t('maxed')}</span>` : `<button class="btn" data-op="up" ${p.coins >= cost ? '' : 'disabled'}>${t('upgrade')} +${plus + 1} · ${cost} ◆</button>`}${held ? `<span class="maxed">${t('held')}</span>` : `<button class="btn alt" data-op="equip">${t('equip')}</button>`}`;
-    const grid = Object.keys(ARM_TYPES).map((ty) => `<div class="armrow"><span class="ty">${t('type_' + ty)}</span>${ARMS.filter((w) => w.type === ty).map((w) => {
+    const grid = Object.keys(ARM_TYPES).map((ty) => `<div class="armrow"><span class="ty">${t('type_' + ty)}</span>${ARMS.filter((w) => w.type === ty && (!w.legend || c.arms[w.id] !== undefined)).map((w) => {
       const o = c.arms[w.id]; return `<button class="atile ${w.id === sel.id ? 'sel' : ''} ${o === undefined ? 'locked' : ''} t${w.tier}" data-arm="${w.id}">${armCv(w.id, o ?? 0, 3)}<b>${o === undefined ? (c.level < w.need ? '🔒' : '') : '+' + o}</b>${armOf(c)[0].id === w.id ? '<i>✓</i>' : ''}</button>`; }).join('')}</div>`).join('');
     view(`<div class="screen arms">${topbar('chars')}<h2>${t('armory')}</h2>
       <div class="card armdetail t${sel.tier}">${armCv(sel.id, plus, 6)}<div class="info"><b>${esc(nm(sel))}${has ? ` +${plus}` : ''}</b><small>${t('type_' + sel.type)} · ${t('t' + sel.tier)}</small>
@@ -160,13 +163,13 @@ const SCREENS = {
   multi() {
     S.args = []; S.combo ||= []; const c = activeChar();
     view(`<div class="screen multi">${topbar('home')}<h2>${t('multi')}</h2>${charCard(c, true)}
-      <button class="btn big ${profile.room ? '' : 'locked'}" data-act="mine" ${profile.room ? '' : 'aria-disabled="true"'}>${t('myroom')}</button>${profile.room ? '' : `<p class="note">${t('guest_mp')}</p>`}
+      <button class="btn big ${profile.room ? '' : 'locked'}" data-act="mine" ${profile.room ? '' : 'aria-disabled="true"'}>${t('mp_create')}</button>${profile.room ? '' : `<p class="note">${t('guest_mp')}</p>`}
       <h3>${t('join')}</h3><p class="note">${t('faces_pick')}</p>
       <div class="slots">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}">${S.combo[i] != null ? heroCv(CLASSES[S.combo[i]].id, 4) : '?'}</button>`).join('')}</div>
       <div class="picker">${CLASSES.map((c, i) => `<button class="face" data-face="${i}">${heroCv(c.id, 3)}</button>`).join('')}</div>
       <p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
       S.msg = '';
-      if (e.target.closest('[data-act=mine]')) { if (!profile.room) return popup(t('need_login'), t('need_login_d')); S.combo = []; joinRoom(''); return; }
+      if (e.target.closest('[data-act=mine]')) { if (!profile.room) return popup(t('need_login'), t('need_login_d')); S.combo = []; return go('mpcreate'); }
       const f = e.target.closest('[data-face]'), sl = e.target.closest('[data-slot]');
       if (sl) { S.combo.splice(+sl.dataset.slot); sfx('click'); return SCREENS.multi(); }
       if (f && S.combo.length < 3) {
@@ -174,6 +177,39 @@ const SCREENS = {
         if (S.combo.length === 3) { const code = S.combo.map((i) => String.fromCharCode(65 + i)).join(''); S.combo = []; return joinRoom(code); }
         SCREENS.multi();
       }
+    }));
+  },
+
+  mpcreate() {
+    S.args = []; const c = activeChar(), pr = profile.p.progress.multi;
+    const cards = DUNGEONS.multi.map((d, i) => { const open = i < pr;
+      return `<button class="dun ${open ? '' : 'lock'} ${d.raid ? 'raid' : ''}" data-d="${d.id}" ${open ? '' : 'disabled'}><b>${esc(nm(d))}${d.raid ? ` · ${t('raid')}` : ''}</b><small>${open ? `${t('recommended')}: ${REC[d.id]}` : d.raid ? t('raid_lock') : t('locked')}</small><span class="bg bg-${d.deco}"></span></button>`; }).join('');
+    view(`<div class="screen multi">${topbar('multi')}<h2>${t('mp_create')}</h2>${charCard(c, true)}<p class="note">${t('team_rules')}</p><p class="note">${t('raid_rules')}</p>
+      <h3>${t('mp_pick')}</h3><div class="duns">${cards}</div><p class="note">${t('mp_pick_d')}</p></div>`, (root) => wire(root, (e) => {
+      const d = e.target.closest('[data-d]'); if (d) { joinRoom(''); S.wantDun = d.dataset.d; }
+    }));
+  },
+
+  inv() {                                       // inventory and merchant: the bag of spare weapons + what the active character owns; a sale pays a bad rate
+    S.args = []; const p = profile.p, c = activeChar(); if (!c) return go('chars');
+    const bag = p.bag || [], sel = S.invSel && (S.invSel.src === 'bag' ? bag[S.invSel.i] && { id: bag[S.invSel.i], plus: 0 } : c.arms[S.invSel.id] !== undefined && { id: S.invSel.id, plus: c.arms[S.invSel.id] });
+    const w = sel ? ARM[sel.id] : null, fixed = w && S.invSel.src === 'char' && (armOf(c)[0].id === w.id || w.id === 'staff1');
+    const detail = w ? `<div class="card armdetail t${w.tier}">${armCv(w.id, sel.plus, 5)}<div class="info"><b>${esc(nm(w))}${S.invSel.src === 'char' ? ` +${sel.plus}` : ''}</b><small>${t('type_' + w.type)} · ${t('t' + w.tier)}</small><small>${t('dmg_mul')} ×${armDmg(w, sel.plus).toFixed(2)}</small><small>${perkText(w, sel.plus)}</small>${w.legend ? `<small class="gold">${t('legend_note')}</small>` : ''}</div></div>
+      <div class="acts">${S.invSel.src === 'bag' ? `<button class="btn" data-op="take" ${c.arms[w.id] !== undefined ? 'disabled' : ''}>${t('give')} (${esc(c.name)})</button>` : ''}${fixed ? `<span class="maxed">${t(armOf(c)[0].id === w.id ? 'is_held' : 'is_starter')}</span>` : `<button class="btn alt" data-op="sell">${t('sell')} · ${armSell(w, sel.plus)} ◆</button>`}</div>` : `<p class="note">${t('sel_weapon')}</p>`;
+    const sellable = bag.filter((id) => !ARM[id].legend), total = sellable.reduce((a, id) => a + armSell(ARM[id], 0), 0);
+    const bagTiles = bag.map((id, i) => `<button class="atile ${S.invSel?.src === 'bag' && S.invSel.i === i ? 'sel' : ''} t${ARM[id].tier}" data-src="bag" data-i="${i}">${armCv(id, 0, 3)}</button>`).join('');
+    const own = Object.entries(c.arms).filter(([id]) => ARM[id]).map(([id, pl]) => `<button class="atile ${S.invSel?.src === 'char' && S.invSel.id === id ? 'sel' : ''} t${ARM[id].tier}" data-src="char" data-id="${id}">${armCv(id, pl, 3)}<b>+${pl}</b>${armOf(c)[0].id === id ? '<i>✓</i>' : ''}</button>`).join('');
+    view(`<div class="screen inv">${topbar('home')}<h2>${t('merchant')}</h2><p class="note">${t('sell_note')}</p>${detail}<p class="msg"></p>
+      <h3>${t('bag')} ${bag.length}/60</h3><div class="baggrid">${bagTiles || `<p class="note">${t('bag_empty')}</p>`}</div>
+      ${sellable.length ? `<button class="btn small alt" data-op="sellall">${t('sell_all')} · ${total} ◆</button>` : ''}
+      <h3>${t('chars_arms')}: ${esc(c.name)}</h3><div class="baggrid">${own}</div></div>`, (root) => wire(root, async (e) => {
+      const tile = e.target.closest('[data-src]');
+      if (tile) { S.invSel = tile.dataset.src === 'bag' ? { src: 'bag', i: +tile.dataset.i } : { src: 'char', id: tile.dataset.id }; sfx('click'); return SCREENS.inv(); }
+      const op = e.target.closest('[data-op]')?.dataset.op; if (!op) return;
+      try {
+        if (op === 'sell' && S.invSel.src === 'char') await profile.arm(c.id, 'sell', S.invSel.id); else await profile.bag(c.id, op, S.invSel?.i ?? 0);
+        S.invSel = null; sfx(op === 'take' ? 'level' : 'coin'); SCREENS.inv();
+      } catch (er) { note(errText(er)); }
     }));
   },
 
@@ -185,13 +221,13 @@ const SCREENS = {
   lobby() {
     S.args = []; const r = S.room, me = r.members.find((m) => m.id === r.you), host = r.hostId === r.you, c = activeChar();
     const members = r.members.map((m) => `<div class="mem">${heroCv(m.cls, 3)}<span><b>${esc(m.name)}</b>${m.id === r.hostId ? ` <small>${t('host')}</small>` : ''}<small>${t('level')} ${m.level} · ${t('power')} ${m.power}</small></span></div>`).join('');
-    const duns = DUNGEONS.multi.map((d, i) => { const open = i < r.unlocked; return `<button class="dun mini ${r.dun === d.id ? 'sel' : ''} ${open ? '' : 'lock'}" data-d="${d.id}" ${host && open ? '' : 'disabled'}><b>${esc(nm(d))}</b><small>${open ? REC[d.id] : '×'}</small></button>`; }).join('');
+    const duns = DUNGEONS.multi.map((d, i) => { const open = i < r.unlocked; return `<button class="dun mini ${r.dun === d.id ? 'sel' : ''} ${open ? '' : 'lock'} ${d.raid ? 'raid' : ''}" data-d="${d.id}" ${host && open ? '' : 'disabled'}><b>${esc(nm(d))}</b><small>${open ? REC[d.id] : '×'}</small></button>`; }).join('');
     const chars = !profile.isGuest && profile.p.chars.length > 1 ? `<select id="chsel">${profile.p.chars.map((x) => `<option value="${x.id}" ${me && x.id === me.charId ? 'selected' : ''}>${esc(x.name)} · ${t('level')} ${x.level}</option>`).join('')}</select>` : '';
     const link = location.origin + location.pathname + '#/room/' + r.code;
     view(`<div class="screen lobby"><div class="top"><button class="icon-btn" data-act="leave">‹</button><span class="who">${t('room_of')} ${esc(r.hostName)}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>
       <div class="card"><p class="note">${t('invite')}</p><div class="faces">${faces(r.code, 5)}</div><button class="btn small" data-act="copy">${t('copy')}</button></div>
       <h3>${t('players')} ${r.members.length}/6</h3><div class="mems">${members}</div>${chars ? `<label class="lab">${t('mychar')}${chars}</label>` : ''}
-      <h3>${t('pick_dun')}</h3><div class="duns row3">${duns}</div>
+      <h3>${t('pick_dun')}</h3><div class="duns row3">${duns}</div><p class="note">${r.dun === 'r1' ? t('raid_rules') : t('team_rules')}</p>
       ${host ? `<button class="btn big" data-act="go">${t('start')}</button>` : `<p class="note">${t('waiting')}</p>`}${profile.isGuest ? `<p class="note">${t('guest_mp')}</p>` : ''}</div>`, (root) => wire(root, (e) => {
       const d = e.target.closest('[data-d]'); if (d) { S.net.send({ t: 'dun', dun: d.dataset.d }); sfx('click'); }
       if (e.target.closest('[data-act=go]')) S.net.send({ t: 'start' });
@@ -207,14 +243,24 @@ const SCREENS = {
     view(`<div class="screen result"><h1 class="${res.cleared ? 'win' : 'lose'}">${res.cleared ? t('win') : t('lose')}</h1>
       <div class="card stats"><div><span>${t('time')}</span><b>${Math.floor(res.time / 60)}:${String(Math.floor(res.time % 60)).padStart(2, '0')}</b></div><div><span>${t('kills')}</span><b>${res.kills ?? 0}</b></div>
       <div><span>${t('coins')}</span><b>+${rw.coins ?? 0} ◆</b></div><div><span>${t('xp')}</span><b>+${rw.xp ?? 0}</b></div>
-      ${res.carry > 1.05 ? `<div><span>${t('carry')}</span><b>×${res.carry.toFixed(1)}</b></div>` : ''}${res.levelUp > 0 ? `<div class="up"><span>${t('lvlup')}</span><b>${res.level}</b></div>` : ''}</div>
-      <button class="btn big" data-act="back">${t('back')}</button></div>`, (root) => wire(root, (e) => {
+      ${res.drops?.length ? `<div class="loot"><span>${t('boss_drops')}</span>${res.drops.map((id) => wTile(id)).join('')}</div>` : ''}${res.carry > 1.05 ? `<div><span>${t('carry')}</span><b>×${res.carry.toFixed(1)}</b></div>` : ''}${res.levelUp > 0 ? `<div class="up"><span>${t('lvlup')}</span><b>${res.level}</b></div>` : ''}</div>
+      ${res.chest ? chestBox() : ''}<button class="btn big" data-act="back">${t('back')}</button></div>`, (root) => wire(root, (e) => {
+      if (e.target.closest('[data-act=loot]')) { S.net?.send({ t: 'loot' }); e.target.closest('button').disabled = true; return; }
       if (!e.target.closest('[data-act=back]')) return;
+      if (!res.multi) { const n = S.net; S.net = null; n?.close(); }      // a single run kept its connection only for the chest
       if (res.multi && S.net?.open) { S.room ? go('lobby') : go('home'); } else go(res.multi ? 'multi' : 'home');
     }));
     music('menu'); sfx(res.cleared ? 'win' : 'lose');
   },
 };
+
+// the end chest: everybody sees what is inside, only the first to open it gets it
+function chestBox() {
+  const ch = S.chest; if (!ch) return '';
+  const tiles = (ids) => `<div class="loot">${ids.map((id) => wTile(id)).join('')}</div>`;
+  if (ch.taken) return `<div class="card chest taken"><h3>${t('chest')}</h3>${tiles(ch.taken.items)}<p class="${ch.taken.mine ? 'gold' : 'note'}">${ch.taken.mine ? `${t('chest_mine')}!` : `${t('chest_by')} ${esc(ch.taken.by)} · ${t('chest_other')}`}</p></div>`;
+  return `<div class="card chest"><h3>${t('chest')}</h3>${tiles(ch.items)}<button class="btn big gold" data-act="loot" ${profile.isGuest ? 'disabled' : ''}>${t('chest_open')}</button><small>${profile.isGuest ? t('need_login_d') : t('chest_hint')}</small></div>`;
+}
 
 function charCard(c, compact) {
   const cl = CLASS[c.cls], st = charStats(c), pw = power(c);
@@ -249,7 +295,7 @@ function startSolo(dunId) {
   leaveRoom(true); S.solo = true; go('connecting');
   S.net = new Net({
     msg: onNet,
-    close: () => { if (S.run) { S.run.destroy(); S.run = null; } if (S.net) { S.net = null; S.solo = false; S.msg = t('lost'); go('single'); } },
+    close: () => { if (S.run) { S.run.destroy(); S.run = null; } if (S.net) { S.net = null; S.solo = false; if (S.screen !== 'result') { S.msg = t('lost'); go('single'); } } },
   });
   S.net.connect({ solo: dunId, char: c.id, nick: c.name, cls: c.cls });
 }
@@ -261,12 +307,12 @@ function joinRoom(code) {
   go('connecting');
   S.net = new Net({
     msg: onNet,
-    close: () => { if (S.run) { S.run.destroy(); S.run = null; } if (S.net) { S.net = null; S.room = null; S.msg = t('lost'); go('multi'); } },
+    close: () => { if (S.run) { S.run.destroy(); S.run = null; } if (S.net) { S.net = null; S.room = null; if (S.screen !== 'result') { S.msg = t('lost'); go('multi'); } } },
   });
   S.net.connect({ code, char: profile.isGuest ? 0 : c.id, nick: c.name, cls: c.cls });
 }
 function leaveRoom(quiet) {
-  const n = S.net; S.net = null; S.room = null;
+  const n = S.net; S.net = null; S.room = null; S.wantDun = null;
   if (S.run) { S.run.destroy(); S.run = null; }
   n?.close();
   if (!quiet) { location.hash = ''; go('multi'); }
@@ -274,18 +320,28 @@ function leaveRoom(quiet) {
 
 function onNet(m) {
   switch (m.t) {
-    case 'room': S.room = m; if (!S.run && S.screen !== 'result') go('lobby'); break;
-    case 'err': { const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char', need_account: 'need_account', full_world: 'full_world' }[m.code]; S.msg = t(k || 'err_x'); const solo = S.solo; S.solo = false; leaveRoom(true); go(solo ? 'single' : 'multi'); break; }
+    case 'room':
+      S.room = m; if (!S.run && S.screen !== 'result') go('lobby');
+      if (S.wantDun && m.hostId === m.you && m.state === 'lobby') { S.net.send({ t: 'dun', dun: S.wantDun }); S.wantDun = null; }      // "create run" picked the dungeon first
+      break;
+    case 'err': { if (S.screen === 'result') return popup(t('need_login'), t('need_login_d'));
+      const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char', need_account: 'need_account', full_world: 'full_world' }[m.code]; S.msg = t(k || 'err_x'); const solo = S.solo; S.solo = false; leaveRoom(true); go(solo ? 'single' : 'multi'); break; }
     case 'start': {
       const c = activeChar();
       S.run = new Run({ root: $app, mode: 'multi', dun: m.dun, players: m.players, meId: m.you, net: S.net, onEnd: () => (S.solo ? S.net?.send({ t: 'leave' }) : leaveRoom()) });   // solo: the server answers a leave with the result
       S.run.start(); break;
     }
     case 's': S.run?.push(m.s, performance.now()); break;
+    case 'looted':
+      if (S.chest) S.chest.taken = { by: m.by, mine: m.mine, items: m.items };
+      sfx(m.mine ? 'win' : 'click');
+      profile.load().catch(() => {}).finally(() => { if (S.screen === 'result') SCREENS.result(...S.args); });
+      break;
     case 'end': {
       const run = S.run; S.run = null; run?.destroy();
-      const solo = S.solo; if (solo) { const n = S.net; S.net = null; S.solo = false; n?.close(); }
-      profile.load().catch(() => {}).finally(() => go('result', { multi: !solo, cleared: m.over.cleared, time: m.over.time, kills: m.kills, reward: m.reward, levelUp: m.levelUp || 0, level: m.level, carry: m.carry }));
+      const solo = S.solo; S.chest = m.chest ? { items: m.chest.items, taken: null } : null;
+      if (solo) { S.solo = false; if (!S.chest) { const n = S.net; S.net = null; n?.close(); } }      // a chest keeps the connection until it is opened
+      profile.load().catch(() => {}).finally(() => go('result', { multi: !solo, cleared: m.over.cleared, time: m.over.time, kills: m.kills, reward: m.reward, levelUp: m.levelUp || 0, level: m.level, carry: m.carry, drops: m.drops, chest: !!m.chest }));
       break;
     }
   }

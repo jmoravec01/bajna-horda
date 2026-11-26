@@ -88,6 +88,8 @@ impl Db {
           CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
         ")?;
         // armory columns (added after the first release); old rows are converted lazily by fix_arms
+        let have_bag: bool = c.prepare("PRAGMA table_info(users)")?.query_map([], |r| r.get::<_, String>(1))?.flatten().any(|n| n == "bag");
+        if !have_bag { c.execute_batch("ALTER TABLE users ADD COLUMN bag TEXT NOT NULL DEFAULT '[]'")?; }
         for col in ["arms", "held"] {
             let have: bool = c.prepare("PRAGMA table_info(chars)")?.query_map([], |r| r.get::<_, String>(1))?.flatten().any(|n| n == col);
             if !have { c.execute_batch(&format!("ALTER TABLE chars ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"))?; }
@@ -129,9 +131,9 @@ impl Db {
     }
     pub fn load_profile(&self, user_id: i64) -> Option<Profile> {
         let c = self.c();
-        let (coins, ps, pm): (i64, i64, i64) = c.query_row("SELECT coins, prog_single, prog_multi FROM users WHERE id = ?", [user_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional().ok().flatten()?;
+        let (coins, ps, pm, bag): (i64, i64, i64, String) = c.query_row("SELECT coins, prog_single, prog_multi, bag FROM users WHERE id = ?", [user_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).optional().ok().flatten()?;
         let mut p = new_profile();
-        p.coins = coins; p.single = ps as usize; p.multi = pm as usize;
+        p.coins = coins; p.single = ps as usize; p.multi = pm as usize; p.bag = serde_json::from_str(&bag).unwrap_or_default();
         let mut st = c.prepare("SELECT id, name, cls, level, xp, e_weapon, e_armor, e_ring, e_boots, arms, held FROM chars WHERE user_id = ? ORDER BY id").ok()?;
         let rows = st.query_map([user_id], |r| Ok(row_char(r))).ok()?;
         for r in rows.flatten() { p.chars.push(r); }
@@ -140,7 +142,7 @@ impl Db {
     pub fn save_profile(&self, user_id: i64, p: &Profile) -> rusqlite::Result<()> {
         let mut c = self.c();
         let tx = c.transaction()?;
-        tx.execute("UPDATE users SET coins = ?, prog_single = ?, prog_multi = ? WHERE id = ?", params![p.coins, p.single as i64, p.multi as i64, user_id])?;
+        tx.execute("UPDATE users SET coins = ?, prog_single = ?, prog_multi = ?, bag = ? WHERE id = ?", params![p.coins, p.single as i64, p.multi as i64, serde_json::to_string(&p.bag).unwrap_or_default(), user_id])?;
         for ch in &p.chars {
             tx.execute("UPDATE chars SET level = ?, xp = ?, e_armor = ?, e_ring = ?, e_boots = ?, arms = ?, held = ? WHERE id = ?", params![ch.level, ch.xp, ch.equip.armor, ch.equip.ring, ch.equip.boots, serde_json::to_string(&ch.arms).unwrap_or_default(), ch.held, ch.id])?;
         }

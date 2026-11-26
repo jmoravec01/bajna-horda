@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sim } from '../shared/sim.js';
-import { CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, BOSS_STAGES, ARMS, ARM, ARM_TIERS, MAX_PLUS, STARTER } from '../shared/data.js';
-import { newChar, power, charStats, applyRun, upgradeEquip, armError, armOf, armDmg, armUpCost, fixArms, createChar, newProfile, xpNeed, runReward, validName, unlocked } from '../shared/meta.js';
+import { LEGEND_OF, CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, BOSS_STAGES, ARMS, ARM, ARM_TIERS, MAX_PLUS, STARTER } from '../shared/data.js';
+import { newChar, power, charStats, applyRun, upgradeEquip, armError, armSell, armOf, armDmg, armUpCost, fixArms, createChar, newProfile, xpNeed, runReward, validName, unlocked } from '../shared/meta.js';
 import { runBot } from '../tools/bot.js';
 
 const ch = (cls, level = 1) => ({ ...newChar(1, 't', cls), level });
@@ -104,8 +104,8 @@ test('meta: rewards, levels, unlocks, equipment, character limits', () => {
   assert.ok(xpNeed(50) > xpNeed(10));
 });
 
-test('armory: 48 weapons, unique ids, buy / equip / upgrade to +9, stronger weapon = stronger hero', () => {
-  assert.equal(ARMS.length, 48); assert.equal(new Set(ARMS.map((w) => w.id)).size, 48);
+test('armory: 48 shop weapons + 7 legendary, unique ids, buy / equip / upgrade to +9, stronger weapon = stronger hero', () => {
+  assert.equal(ARMS.length, 55); assert.equal(new Set(ARMS.map((w) => w.id)).size, 55); assert.equal(ARMS.filter((w) => !w.legend).length, 48);
   assert.ok(ARM[STARTER] && ARM[STARTER].tier === 1);
   const p = newProfile(); createChar(p, 'Kuba', 'perun', 1); const c = p.chars[0];
   assert.deepEqual([c.held, c.arms], [STARTER, { [STARTER]: 0 }]);
@@ -156,4 +156,24 @@ test('no run is longer than HARD_END and the pacing keeps getting harder', () =>
   a.tick = 20 * 280; a.step(); const late = a.spawn([a.players[0]], 0, false).maxHp;
   assert.ok(late > early * 2.5);
   a.tick = 20 * 481; a.step(); assert.equal(a.over?.cleared, false);
+});
+
+test('merchant: a sale pays a bad rate, the held and the starter weapon stay, a legendary weapon cannot be bought', () => {
+  const p = newProfile(); createChar(p, 'Kuba', 'perun', 1); const c = p.chars[0]; c.level = 50; p.coins = 1e6;
+  assert.deepEqual(Object.keys(LEGEND_OF).sort(), Object.keys(DUNGEON).sort());          // every dungeon has its own legendary weapon
+  assert.ok(Object.values(LEGEND_OF).every((id) => ARM[id].legend && ARM[id].dmg > ARM.sword4.dmg));
+  assert.equal(armError(p, 1, 'buy', LEGEND_OF.s1), 'bad');
+  assert.equal(armError(p, 1, 'buy', 'axe2'), null); assert.equal(armError(p, 1, 'up', 'axe2'), null);
+  const paid = armSell(ARM.axe2, 1); assert.ok(paid < ARM.axe2.price / 2 && paid >= ARM.axe2.price / 4);
+  const coins = p.coins; assert.equal(armError(p, 1, 'sell', 'axe2'), null); assert.equal(p.coins, coins + paid); assert.equal(c.arms.axe2, undefined);
+  assert.equal(armError(p, 1, 'sell', 'axe2'), 'bad');
+  assert.equal(armError(p, 1, 'sell', STARTER), 'held');
+  armError(p, 1, 'buy', 'axe2'); armError(p, 1, 'equip', 'axe2'); assert.equal(armError(p, 1, 'sell', 'axe2'), 'held');
+});
+
+test('team dungeons: 10-minute runs with three shielded bosses, the raid is a multiplayer dungeon that is much harder', () => {
+  for (const d of DUNGEONS.multi) { assert.equal(d.secs, 600); assert.ok(d.shrines >= 3); assert.equal(d.stages.length, 3); assert.equal(d.stages[2].at, 540); }
+  for (const d of DUNGEONS.single) { assert.equal(d.secs, 300); assert.equal(d.shrines, 0); }
+  const raid = DUNGEON.r1; assert.ok(raid.raid && raid.shrines === 4 && raid.diff > 1.5 * DUNGEON.m3.diff && raid.spawn > DUNGEON.m3.spawn);
+  assert.equal(DUNGEONS.multi.at(-1), raid);                                                  // opens after the last ordinary one
 });

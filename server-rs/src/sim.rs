@@ -10,7 +10,9 @@ const BASE_HP: f64 = 100.0;
 const PICKUP_R: f64 = 26.0;
 const TOUCH_R: f64 = 10.0;      // hearts, magnets and chests are not pulled in: walk over them
 const CELL: f64 = 24.0;
-const HARD_END: f64 = 480.0;      // seconds; the last boss has three minutes, then the run fails
+const HARD_GRACE: f64 = 180.0;    // seconds the last boss has, then the run fails
+const SHRINE_R: f64 = 26.0;       // a shrine is captured by standing in this circle
+const SHRINE_DIST: f64 = 125.0;   // shrines sit on a ring this far from the start
 
 pub struct Rng(u32);
 impl Rng {
@@ -94,7 +96,7 @@ struct Pick { id: i64, tier: u8, x: f64, y: f64, v: f64, mag: bool }
 
 #[derive(Clone)]
 pub enum Ev {
-    Hit(f64, f64), Crit(f64, f64), Die(f64, f64, u8), Ring(f64, f64, f64, usize), Boom(f64, f64, f64), Chain(Vec<f64>), BossWarn(usize), Atk(f64, f64, u32, usize),
+    Hit(f64, f64), Crit(f64, f64), Die(f64, f64, u8), Ring(f64, f64, f64, usize), Boom(f64, f64, f64), Chain(Vec<f64>), BossWarn(usize), Atk(f64, f64, u32, usize), Shrine(usize, bool),
     Personal(char, u32),   // L u x g $ + M C m v: only the owner needs these
 }
 
@@ -124,16 +126,22 @@ pub struct Sim {
     d_mul: f64,
     c_mul: f64,
     louze: usize,
+    shrines: Vec<Shrine>,
+    siege_t: f64,
 }
+
+struct Shrine { x: f64, y: f64, prog: f64, held: bool }
 
 impl Sim {
     pub fn new(seed: u32, dungeon_id: &str, players: Vec<SimPlayerIn>) -> Sim {
         let dun = dungeon(dungeon_id).expect("dungeon");
         let mut sim = Sim {
             rnd: Rng::new(seed), dun, tick: 0, nid: 1, players: vec![], enemies: vec![], objs: vec![], ebul: vec![], picks: vec![], ev: vec![], over: None,
-            spawn_acc: 0.0, elite_done: 0, boss_n: 0, grid: HashMap::new(), threat: 0.0, e_mul: 1.0, d_mul: 1.0, c_mul: 1.0, louze: weapon_idx("louze"),
+            spawn_acc: 0.0, elite_done: 0, boss_n: 0, grid: HashMap::new(), threat: 0.0, e_mul: 1.0, d_mul: 1.0, c_mul: 1.0, louze: weapon_idx("louze"), shrines: vec![], siege_t: 0.0,
         };
         for (i, c) in players.into_iter().enumerate() { let p = sim.make_player(i as u32 + 1, c); sim.players.push(p); }
+        let k = dun.shrines;                                   // team dungeons: shrines on a ring; no RNG is used when there are none
+        if k > 0 { let off = sim.rnd.next() * 6.283; sim.shrines = (0..k).map(|i| { let a = off + i as f64 / k as f64 * 6.283; Shrine { x: a.cos() * SHRINE_DIST, y: a.sin() * SHRINE_DIST, prog: 0.0, held: false } }).collect(); }
         let n = sim.players.len();
         let top = sim.players.iter().map(|p| p.power).max().unwrap_or(100) as f64;
         sim.threat = top * (1.0 + 0.25 * (n as f64 - 1.0));
@@ -181,7 +189,7 @@ impl Sim {
     // ---------- helpers ----------
     fn dmg_mul(&self, pi: usize) -> f64 {
         let p = &self.players[pi];
-        let mut m = p.st.dmg * p.cl.dmg * (1.0 + 0.1 * Self::pl(p, "sila") as f64);
+        let mut m = p.st.dmg * p.cl.dmg * (1.0 + 0.1 * Self::pl(p, "sila") as f64) * (1.0 + 0.08 * self.held() as f64);   // every held shrine: +8 % damage for the team
         if p.cl.ramp != 0.0 {
             let s = self.tick as f64 * data().consts.dt;
             m *= if s < 120.0 { 0.7 } else { 0.7 + 0.9 * ((s - 120.0) / 360.0).min(1.0) };
@@ -193,6 +201,13 @@ impl Sim {
         (p.st.cd * (1.0 - 0.06 * Self::pl(p, "spech") as f64)).max(0.4)
     }
     fn now(&self) -> f64 { self.tick as f64 * data().consts.dt }
+    fn held(&self) -> usize { self.shrines.iter().filter(|s| s.held).count() }
+    /// A boss cannot be hurt until enough shrines are held: all of them for the last one.
+    fn shielded(&self, stage: usize) -> bool {
+        let total = self.shrines.len();
+        total > 0 && self.held() < (total * (stage + 1)).div_ceil(self.dun.stages().len())
+    }
+    fn hard_end(&self) -> f64 { self.dun.stages().last().map_or(480.0, |s| s.at) + HARD_GRACE }
 
     fn grid_build(&mut self) {
         for a in self.grid.values_mut() { a.clear(); }
@@ -230,7 +245,7 @@ impl Sim {
 
     // ---------- damage ----------
     fn hurt_enemy(&mut self, ei: usize, dmg: f64, owner: Option<usize>, quiet: bool) {
-        if self.enemies[ei].dead { return; }
+        if self.enemies[ei].dead || (self.enemies[ei].boss && self.shielded(self.enemies[ei].stage)) { return; }
         let mut dmg = dmg;
         if let Some(pi) = owner {
             if !quiet {
@@ -274,13 +289,13 @@ impl Sim {
         self.emit(Ev::Die(r1(x), r1(y), if boss { 2 } else if elite { 1 } else { 0 }));
         if let Some(pi) = owner { self.players[pi].kills += 1; }
         if boss {
-            if stage + 1 == data().boss_stages.len() { self.finish(true); return; }      // the last boss clears the dungeon
+            if stage + 1 == self.dun.stages().len() { self.finish(true); return; }      // the last boss clears the dungeon
             self.drop(x, y, 6, 0.0);                                                       // the others pay with a chest and coins
             for i in 0..4 { let a = i as f64 * 1.6; self.drop(x + a.cos() * 8.0, y + a.sin() * 8.0, 3, 5.0); }
             return;
         }
         let oi = owner.unwrap_or(0);
-        let xp = exp * (1.0 + 0.15 * (self.now() * data().pace / 120.0).min(4.0));
+        let xp = exp * (1.0 + 0.15 * (self.now() * self.dun.pace / 120.0).min(4.0));
         self.drop(x, y, if xp < 3.0 { 0 } else if xp < 8.0 { 1 } else { 2 }, xp);
         if elite { self.drop(x + 4.0, y, 6, 0.0); return; }
         let r = self.rnd.next();
@@ -376,13 +391,14 @@ impl Sim {
 
         self.objs.retain(|o| !o.dummy);
         self.director(t, &alive);
+        self.update_shrines(&alive);
         self.grid_build();
         self.update_enemies(t, &alive);
         for pi in 0..self.players.len() { if !self.players[pi].dead { self.fire(pi, t); } }
         self.update_objs(t);
         self.update_picks(&alive);
         self.enemies.retain(|e| !e.dead);
-        if self.over.is_none() && t >= HARD_END { self.finish(false); }
+        if self.over.is_none() && t >= self.hard_end() { self.finish(false); }
     }
 
     pub fn finish_now(&mut self) { self.finish(false); }
@@ -390,25 +406,65 @@ impl Sim {
         self.over = Some(Over { cleared, time: self.now(), players: self.players.iter().map(|p| OverPlayer { kills: p.kills, coins: p.coins, reward: p.reward }).collect() });
     }
 
+    // ---------- shrines ----------
+    // Capturing needs two players in the circle (three in the raid), or everyone still alive if fewer, and the circle must be fairly clear of enemies.
+    // Held shrines heal whoever stands in them and give the team +8 % damage each; every so often a held shrine is lost to a siege.
+    fn update_shrines(&mut self, alive: &[usize]) {
+        if self.shrines.is_empty() { return; }
+        let dt = data().consts.dt;
+        let want = (if self.dun.raid { 3 } else { 2 }).min(alive.len());
+        for si in 0..self.shrines.len() {
+            let (sx, sy) = (self.shrines[si].x, self.shrines[si].y);
+            let inside = alive.iter().filter(|&&i| dist2(self.players[i].x, self.players[i].y, sx, sy) < SHRINE_R * SHRINE_R).count();
+            if self.shrines[si].held {
+                for &i in alive { if dist2(self.players[i].x, self.players[i].y, sx, sy) < SHRINE_R * SHRINE_R { let p = &mut self.players[i]; p.hp = (p.hp + p.max_hp * 0.04 * dt).min(p.max_hp); } }
+                continue;
+            }
+            let foes = self.enemies.iter().filter(|e| !e.dead && dist2(e.x, e.y, sx, sy) < (SHRINE_R + e.r) * (SHRINE_R + e.r)).count();
+            let h = &mut self.shrines[si];
+            if inside >= want && foes <= 3 { h.prog += dt / 8.0 * (1.0 + 0.4 * (inside - want) as f64); }
+            else if inside == 0 { h.prog = (h.prog - dt / 25.0).max(0.0); }
+            if h.prog >= 1.0 {
+                h.prog = 1.0; h.held = true;
+                self.emit(Ev::Shrine(si, true));
+                for k in 0..6 { let a = k as f64 * 1.05; self.drop(sx + a.cos() * 9.0, sy + a.sin() * 9.0, 2, 6.0); }
+            }
+        }
+        let every = if self.dun.raid { 80.0 } else { 150.0 };
+        self.siege_t += dt;
+        if self.siege_t >= every {
+            self.siege_t = 0.0;
+            let held: Vec<usize> = (0..self.shrines.len()).filter(|&i| self.shrines[i].held).collect();
+            if !held.is_empty() && !alive.is_empty() {
+                let si = held[(self.rnd.next() * held.len() as f64) as usize % held.len()];
+                let (sx, sy) = (self.shrines[si].x, self.shrines[si].y);
+                self.shrines[si].held = false; self.shrines[si].prog = 0.4;
+                self.emit(Ev::Shrine(si, false));
+                let id = self.spawn(alive, 5);                     // an elite storms the lost shrine
+                if let Some(e) = self.enemies.iter_mut().find(|e| e.id == id) { e.x = sx; e.y = sy; }
+            }
+        }
+    }
+
     // ---------- spawning ----------
     fn director(&mut self, t: f64, alive: &[usize]) {
         let dt = data().consts.dt;
         let n = self.players.len();
-        let tp = t * data().pace;                                  // difficulty clock
-        // elites at 2:00 and 4:00; bosses at 1:00, 3:00 and 5:00
+        let tp = t * self.dun.pace;                                // difficulty clock
+        // elites at 2:00 and 4:00 (single: bosses at 1:00, 3:00, 5:00; team runs: 2:00, 5:30, 9:00)
         if self.elite_done < 2 && t >= 120.0 + self.elite_done as f64 * 120.0 { self.elite_done += 1; self.spawn(alive, 5); }
-        if let Some(st) = data().boss_stages.get(self.boss_n) {
+        if let Some(st) = self.dun.stages().get(self.boss_n) {
             if t >= st.at { self.spawn(alive, 6 + self.boss_n); self.boss_n += 1; self.emit(Ev::BossWarn(self.boss_n)); }
         }
         let ramp = tp.min(480.0) / 60.0;
-        let rate = (0.7 + 0.9 * ramp) * self.c_mul * if self.enemies.iter().any(|e| e.boss && !e.dead) { 0.5 } else { 1.0 };
+        let rate = (0.7 + 0.9 * ramp) * self.c_mul * self.dun.spawn * if self.enemies.iter().any(|e| e.boss && !e.dead) { 0.5 } else { 1.0 };
         let cap = js_round((60.0 + 22.0 * ramp) * (1.0 + 0.5 * (n as f64 - 1.0))) as usize;
         self.spawn_acc += rate * dt;
         while self.spawn_acc >= 1.0 {
             self.spawn_acc -= 1.0;
             if self.enemies.len() >= cap { continue; }
             let d = self.dun;
-            let avail: Vec<usize> = (0..d.roster.len()).filter(|&i| t * data().pace >= d.roster[i].at).collect();
+            let avail: Vec<usize> = (0..d.roster.len()).filter(|&i| t * d.pace >= d.roster[i].at).collect();
             let tot: f64 = avail.iter().map(|&i| d.roster[i].weight).sum();
             let mut x = self.rnd.next() * tot;
             let mut idx = avail[0];
@@ -425,11 +481,11 @@ impl Sim {
         let a = self.rnd.next() * 6.283;
         let dist = 235.0 + self.rnd.next() * 20.0;
         let (arch, hp_base, scale, elite, boss);
-        let bst = data().boss_stages.get(idx.wrapping_sub(6));
+        let bst = self.dun.stages().get(idx.wrapping_sub(6));
         if let Some(b) = bst { arch = &data().arch[&d.boss.arch]; hp_base = d.boss.hp * b.hp; scale = d.boss.scale * b.size; boss = true; elite = false; }
         else if idx == 5 { arch = &data().arch[&d.elite]; hp_base = arch.hp * 8.0; scale = 1.5; elite = true; boss = false; }
         else { arch = &data().arch[&d.roster[idx].arch]; hp_base = arch.hp; scale = 1.0; elite = false; boss = false; }
-        let tpace = t * data().pace;
+        let tpace = t * d.pace;
         let ts_hp = 1.0 + tpace / 60.0 * 0.6;
         let ts_dmg = 1.0 + tpace / 60.0 * 0.12;
         let hp = hp_base * if boss { 1.0 } else { ts_hp } * self.e_mul * d.diff;
@@ -543,7 +599,7 @@ impl Sim {
 
     fn boss_ai(&mut self, i: usize, t: f64, tp: usize, dist: f64) {
         let dt = data().consts.dt;
-        let stages = &data().boss_stages;
+        let stages = self.dun.stages();
         let st = &stages[self.enemies[i].stage];
         let enrage = if self.enemies[i].stage + 1 == stages.len() && t > st.at + 60.0 { 1.5 } else { 1.0 };   // the last boss gets angry after a minute
         self.enemies[i].bt -= dt;
@@ -894,6 +950,7 @@ impl Sim {
             match e {
                 Ev::Personal(k, id) => { if *id == pid { v.push(json!([k.to_string(), id])); } }
                 Ev::BossWarn(n) => v.push(json!(["B", n])),
+                Ev::Shrine(i, held) => v.push(json!(["S", i, if *held { 1 } else { 0 }])),
                 Ev::Chain(pts) => { if near(pts[0], pts[1]) { v.push(json!(["c", pts])); } }
                 Ev::Hit(x, y) => { if near(*x, *y) { v.push(json!(["h", x, y])); } }
                 Ev::Crit(x, y) => { if near(*x, *y) { v.push(json!(["k", x, y])); } }
@@ -908,7 +965,7 @@ impl Sim {
         for e in &self.enemies {
             if e.dead || !near(e.x, e.y) { continue; }
             let hpq = if e.max_hp != 0.0 { js_round(e.hp / e.max_hp * 100.0).max(1.0) } else { 100.0 };
-            let flags = (if e.flash != 0 { 1 } else { 0 }) | (if e.freeze_until > now { 2 } else { 0 }) | (if e.burn_until > now { 4 } else { 0 }) | (if e.slow_until > now { 8 } else { 0 });
+            let flags = (if e.flash != 0 { 1 } else { 0 }) | (if e.freeze_until > now { 2 } else { 0 }) | (if e.burn_until > now { 4 } else { 0 }) | (if e.slow_until > now { 8 } else { 0 }) | (if e.boss && self.shielded(e.stage) { 16 } else { 0 });
             es.push(json!([e.id, e.typ, r1(e.x), r1(e.y), hpq, flags]));
         }
         let os: Vec<Value> = self.objs.iter().filter(|o| near(o.x, o.y)).map(|o| json!([o.id, o.wix, r1(o.x), r1(o.y), r1(o.ang), r1(o.r), if o.kind == OK::Z { js_round(o.life * 10.0) / 10.0 } else { 0.0 }])).collect();
@@ -921,8 +978,11 @@ impl Sim {
         let mut s = json!({
             "k": self.tick, "T": r1(now), "p": players, "e": es, "o": os, "b": bs, "g": gs, "v": v,
             "me": { "xp": me.xp.floor(), "need": lvl_need(me.level), "level": me.level, "coins": me.coins.floor(), "kills": me.kills, "spd": r1(me.spd), "pend": me.pending.len(),
-                    "ch": ch, "w": me.weapons.iter().map(|w| json!([w.wix, w.lvl])).collect::<Vec<_>>(), "ps": ps, "dead": me.dead, "boss": boss_pct },
+                    "ch": ch, "w": me.weapons.iter().map(|w| json!([w.wix, w.lvl])).collect::<Vec<_>>(), "ps": ps, "dead": me.dead, "boss": boss_pct, "shield": self.enemies.iter().any(|e| e.boss && !e.dead && self.shielded(e.stage)) },
         });
+        if !self.shrines.is_empty() {
+            s["sh"] = json!(self.shrines.iter().map(|h| json!([js_round(h.x) as i64, js_round(h.y) as i64, js_round(h.prog * 100.0) as i64, if h.held { 1 } else { 0 }])).collect::<Vec<_>>());
+        }
         if let Some(o) = &self.over {
             s["over"] = json!({ "cleared": o.cleared, "time": o.time, "players": o.players.iter().enumerate().map(|(i, p)| json!({ "id": i + 1, "kills": p.kills, "coins": p.coins, "reward": p.reward, "dead": self.players[i].dead })).collect::<Vec<_>>() });
         }
@@ -964,6 +1024,12 @@ mod tests {
         for b in &sim.ebul { let (dx, dy) = (px - b.x, py - b.y); let d2 = dx * dx + dy * dy; if d2 < 900.0 && d2 > 0.01 { let d = d2.sqrt(); fx += dx / d * 0.8; fy += dy / d * 0.8; } }
         let mut best: Option<(f64, f64)> = None; let mut bd = 1e9;
         for g in &sim.picks { let d = dist2(g.x, g.y, px, py); if d < bd && d < 90.0 * 90.0 { bd = d; best = Some((g.x, g.y)); } }
+        if fx.hypot(fy) < 0.6 {            // team dungeons: go and hold the shrines together (everyone heads for the same one)
+            if let Some(h) = sim.shrines.iter().find(|h| !h.held) {
+                let (dx, dy) = (h.x - px, h.y - py); let d = dx.hypot(dy);
+                if d > 12.0 { fx += dx / d * 0.9; fy += dy / d * 0.9; }
+            }
+        }
         if let Some((gx, gy)) = best { if fx.hypot(fy) < 0.6 { let d = bd.sqrt().max(1e-9); fx += (gx - px) / d * 0.7; fy += (gy - py) / d * 0.7; } }
         if fx.hypot(fy) < 0.05 { let a = sim.tick as f64 * 0.02 + id as f64; fx = a.cos() * 0.3; fy = a.sin() * 0.3; }
         sim.set_input(id, fx, fy);
@@ -1027,7 +1093,7 @@ mod tests {
     fn three_bosses_each_tougher_only_the_last_clears() {
         let mut s = Sim::new(4, "s1", vec![input("golem", 30)]);
         let mut hp = vec![];
-        for (i, at) in data().boss_stages.iter().map(|b| b.at).collect::<Vec<_>>().into_iter().enumerate() {
+        for (i, at) in s.dun.stages().iter().map(|b| b.at).collect::<Vec<_>>().into_iter().enumerate() {
             s.tick = (at * 20.0).round() as u64 + 1; s.step();
             let bi = s.enemies.iter().position(|e| e.boss && e.stage == i).expect("boss spawned");
             assert!(!s.enemies.iter().any(|e| e.boss && e.stage == i + 1));
@@ -1037,6 +1103,36 @@ mod tests {
         assert!(hp[0] < hp[1] && hp[1] < hp[2]);
         let t = s.enemies.iter().position(|e| e.boss && e.stage == 2).unwrap();
         s.hurt_enemy(t, 1e9, Some(0), false); assert!(s.over.as_ref().unwrap().cleared);
+    }
+
+    #[test]
+    fn team_runs_last_ten_minutes_and_shrines_gate_the_boss() {
+        assert_eq!(Sim::new(1, "s1", vec![input("golem", 30)]).hard_end(), 480.0);
+        let mut s = Sim::new(5, "m1", vec![input("golem", 30), input("golem", 30)]);
+        assert_eq!(s.hard_end(), 720.0);
+        assert_eq!(s.shrines.len(), 3);
+        s.tick = 20 * 121; s.step();
+        let bi = s.enemies.iter().position(|e| e.boss && e.stage == 0).expect("first boss");
+        let hp = s.enemies[bi].hp;
+        s.hurt_enemy(bi, 1e6, Some(0), false);
+        assert_eq!(s.enemies[bi].hp, hp, "a boss is shielded while no shrine is held");
+        // one player alone cannot take a shrine: two are needed
+        let (sx, sy) = (s.shrines[0].x, s.shrines[0].y);
+        let hold = |s: &mut Sim, both: bool| for _ in 0..20 * 10 {
+            s.enemies.retain(|e| e.boss);
+            s.players[0].x = sx; s.players[0].y = sy; s.players[1].x = if both { sx } else { sx + 90.0 }; s.players[1].y = sy;
+            for p in s.players.iter_mut() { p.hp = p.max_hp; }
+            s.step();
+        };
+        hold(&mut s, false);
+        assert_eq!(s.held(), 0);
+        hold(&mut s, true);
+        assert_eq!(s.held(), 1);
+        let bi = s.enemies.iter().position(|e| e.boss && e.stage == 0).unwrap();
+        let hp = s.enemies[bi].hp;
+        s.hurt_enemy(bi, 10.0, Some(0), false);
+        assert!(s.enemies[bi].hp < hp, "one shrine opens the first boss");
+        assert!(s.shielded(2), "the last boss wants every shrine");
     }
 
     #[test]
@@ -1059,7 +1155,7 @@ mod tests {
     #[test]
     #[ignore]
     fn balance() {
-        let scen: [(&str, &str, &[u32]); 7] = [("s1 lvl1", "s1", &[1]), ("s2 lvl8", "s2", &[8]), ("s3 lvl18", "s3", &[18]), ("m1 2x lvl5", "m1", &[5, 5]), ("m2 3x lvl12", "m2", &[12, 12, 12]), ("m3 4x lvl25", "m3", &[25, 25, 25, 25]), ("m1 lvl1+lvl20", "m1", &[1, 20])];
+        let scen: [(&str, &str, &[u32]); 8] = [("s1 lvl1", "s1", &[1]), ("s2 lvl8", "s2", &[8]), ("s3 lvl18", "s3", &[18]), ("m1 2x lvl5", "m1", &[5, 5]), ("m2 3x lvl12", "m2", &[12, 12, 12]), ("m3 4x lvl25", "m3", &[25, 25, 25, 25]), ("r1 4x lvl40", "r1", &[40, 40, 40, 40]), ("m1 lvl1+lvl20", "m1", &[1, 20])];
         for (label, dun, lvls) in scen {
             let (mut win, mut n, mut tt) = (0, 0, 0.0);
             for (ci, c) in data().classes.iter().enumerate() { for seed in 1..=2u32 {

@@ -1,9 +1,0 @@
-[request]
-method = "GET"
-path = "/nope"
-
-[response]
-status = 404
-
-[response.headers]
-content-type = "application/json"

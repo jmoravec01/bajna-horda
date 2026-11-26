@@ -137,6 +137,21 @@ export function render(ctx, W, H, sc, now, lastDir) {
     disc(ctx, px, py, r, col, 0.28); ring(ctx, px, py, r, col, 0.7);
     for (let i = 0; i < 5; i++) { const t = (now / 700 + i * 0.37 + o[0]) % 1, bx = px + Math.round(Math.sin(i * 2.4 + o[0]) * r * 0.6), by = py + Math.round(Math.cos(i * 1.7) * r * 0.5 - t * 8); ctx.fillStyle = col; ctx.globalAlpha = 1 - t; ctx.fillRect(bx, by, 2, 2); ctx.globalAlpha = 1; }
   }
+  // shrines (team dungeons): a ring on the ground, a flag, a capture bar; an arrow at the screen edge points to the ones that are off screen
+  for (const h of c.sh || []) {
+    const held = h[3], col = held ? '#ffd23f' : '#9fd8ff', px = sx(h[0]), py = sy(h[1]);
+    if (!vis(h[0], h[1], 30)) {
+      const a = Math.atan2(py - H / 2, px - W / 2), k = Math.min((W / 2 - 7) / Math.max(1e-3, Math.abs(Math.cos(a))), (H / 2 - 7) / Math.max(1e-3, Math.abs(Math.sin(a))));
+      const ax = Math.round(W / 2 + Math.cos(a) * k), ay = Math.round(H / 2 + Math.sin(a) * k);
+      ctx.globalAlpha = held ? 0.5 : 0.95; ctx.fillStyle = '#000'; ctx.fillRect(ax - 3, ay - 3, 7, 7); ctx.fillStyle = col; ctx.fillRect(ax - 2, ay - 2, 5, 5); ctx.globalAlpha = 1;
+      continue;
+    }
+    disc(ctx, px, py, 26, col, held ? 0.2 : 0.1); ring(ctx, px, py, 26, col, held ? 0.9 : 0.55);
+    ctx.fillStyle = '#000'; ctx.fillRect(px - 1, py - 15, 3, 18); ctx.fillStyle = '#6b4a2a'; ctx.fillRect(px, py - 14, 1, 16);
+    ctx.fillStyle = '#000'; for (let i = 0; i < 7; i++) ctx.fillRect(px + 1, py - 15 + i, 10 - i, 1);
+    ctx.fillStyle = col; for (let i = 0; i < 6; i++) ctx.fillRect(px + 1, py - 14 + i, 8 - i, 1);
+    if (!held && h[2] > 0) { ctx.fillStyle = '#000'; ctx.fillRect(px - 10, py + 5, 20, 4); ctx.fillStyle = col; ctx.fillRect(px - 9, py + 6, Math.round(18 * h[2] / 100), 2); }
+  }
   // pickups
   for (const g of c.g) {
     if (!vis(g[2], g[3])) continue;
@@ -171,6 +186,7 @@ export function render(ctx, W, H, sc, now, lastDir) {
       if (arch === 'ghost') ctx.globalAlpha = 0.75;
       ctx.drawImage(img, -(w >> 1), -(h >> 1), w, h);
       ctx.restore();
+      if (fl & 16) { const rr = (Math.max(w, h) >> 1) + 3, cy = py - (h >> 1); disc(ctx, px, cy, rr, '#7ad8ff', 0.18); ring(ctx, px, cy, rr, '#bfeaff', 0.5 + 0.3 * Math.sin(now / 200)); }       // a shielded boss
       if (e[1] >= 5) { const bw = Math.max(14, w); ctx.fillStyle = '#000'; ctx.fillRect(px - (bw >> 1) - 1, py - h - 4, bw + 2, 4); ctx.fillStyle = e[1] >= 6 ? '#e33' : '#f90'; ctx.fillRect(px - (bw >> 1), py - h - 3, Math.round(bw * e[4] / 100), 2); }
     } else {
       const pl = sc.players.find((q) => q.id === e[0]) || { cls: 'bohatyr', name: '?' };

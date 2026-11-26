@@ -11,6 +11,13 @@ export const BOSS_STAGES = [
   { at: 180, hp: 0.25, dmg: 0.7,  size: 0.8, ring: 9,  minions: 4, every: 10 },
   { at: 300, hp: 0.7,  dmg: 1,    size: 1,   ring: 14, minions: 6, every: 8 },
 ];
+// team runs (multiplayer and the raid) last 10 minutes: bosses at 2:00, 5:30 and 9:00, and each one is shielded until enough shrines are held
+export const TEAM_SECONDS = 600;
+export const TEAM_STAGES = [
+  { at: 120, hp: 0.10, dmg: 0.5, size: 0.6, ring: 8,  minions: 3, every: 12 },
+  { at: 330, hp: 0.40, dmg: 0.7, size: 0.8, ring: 11, minions: 5, every: 10 },
+  { at: 540, hp: 1.00, dmg: 1,   size: 1,   ring: 16, minions: 8, every: 8 },
+];
 export const MAX_LEVEL = 100;
 export const MAX_WEAPONS = 5, MAX_PASSIVES = 5, MAX_ITEM_LVL = 8;
 
@@ -90,7 +97,8 @@ export const ARCH = {
 
 // ---- dungeons ----
 // roster: [arch, palette[main, dark, accent], appears-at-seconds, weight]; the last two entries are the elite and the boss
-const dun = (o) => o;
+// team dungeons (mode 'multi') get 10-minute runs, shrines to hold and a pace of their own; single ones keep the 5-minute defaults
+const dun = (o) => (o.mode === 'multi' ? { secs: TEAM_SECONDS, stages: TEAM_STAGES, shrines: 3, pace: 0.9, spawn: 1.2, ...o } : { secs: RUN_SECONDS, stages: BOSS_STAGES, shrines: 0, pace: PACE, spawn: 1, ...o });
 export const DUNGEONS = {
   single: [
     dun({ id: 's1', mode: 'single', cs: 'Louka', en: 'Meadow', diff: 1.0, xp: 1, bg: ['#3d7a3a', '#356d33', '#4f8f45', '#2d5e2b'], deco: 'grass',
@@ -113,6 +121,10 @@ export const DUNGEONS = {
     dun({ id: 'm3', mode: 'multi', cs: 'Ledovec', en: 'Glacier', diff: 1.9, xp: 2, bg: ['#a8c8d8', '#9abccc', '#b8d6e4', '#88aabb'], deco: 'ice',
       roster: [['imp', ['#6ac8f0', '#1a5a8a', '#fff'], 0, 6], ['wolf', ['#e8f0f8', '#8aa0b0', '#38f'], 25, 4], ['ghost', ['#d0e8ff', '#7a9ac0', '#fff'], 80, 3], ['boar', ['#b8d0e0', '#5a7a90', '#fff'], 150, 2.5], ['ogre', ['#9ac0d8', '#3a5a78', '#fff'], 240, 1.5]],
       elite: ['ogre', ['#6aa0d8', '#1a3a6a', '#ff0']], boss: { arch: 'ogre', pal: ['#ffffff', '#5a8ab0', '#38f'], name_cs: 'Zimní královna', name_en: 'Winter Queen', hp: 5200, scale: 2.8 } }),
+    // the raid: shaped like a multiplayer dungeon, several times harder (stronger enemies, faster waves, four shrines); open once Glacier is cleared
+    dun({ id: 'r1', mode: 'multi', raid: true, cs: 'Navia', en: 'Navia', diff: 3.2, xp: 4, spawn: 1.45, pace: 1.0, shrines: 4, bg: ['#2a1f3a', '#241a32', '#34274a', '#1a1226'], deco: 'bones',
+      roster: [['ghost', ['#c8a8ff', '#5a3a8a', '#fff'], 0, 5], ['imp', ['#9a3ad8', '#3a0a5a', '#ff0'], 0, 4], ['wolf', ['#3a2a4a', '#0e0816', '#f3f'], 40, 3], ['spider', ['#5a2a6a', '#1a0a22', '#f6f'], 90, 3], ['boar', ['#4a2a5a', '#160a1e', '#fff'], 150, 2.5], ['ogre', ['#6a3a8a', '#1e0a2e', '#fd0'], 220, 1.5]],
+      elite: ['ogre', ['#8a3ac8', '#2a0a44', '#ff0']], boss: { arch: 'ogre', pal: ['#b020f0', '#2a0640', '#ff3'], name_cs: 'Černobog', name_en: 'Chernobog', hp: 9000, scale: 3.4 } }),
   ],
 };
 export const DUNGEON = Object.fromEntries([...DUNGEONS.single, ...DUNGEONS.multi].map((d) => [d.id, d]));
@@ -157,5 +169,18 @@ export const ARMS = Object.entries(ARM_NAMES).flatMap(([type, names]) => names.m
   const T = ARM_TIERS[i], Y = ARM_TYPES[type];
   return { id: type + (i + 1), type, tier: i + 1, cs, en, dmg: T.dmg * Y.dmg, perk: Y.perk, perkVal: T.perk, need: T.need, price: T.price };
 }));
+// ---- legendary weapons: one per dungeon, found only in that dungeon's end chest (never in the armory shop). id = type + '5' ----
+// [dungeon, type, damage, perk strength, price (a sale pays a quarter), cs, en]
+const LEGENDS = [
+  ['s1', 'club',   2.05, 0.09, 6000,  'Palice Lesního obra', "Forest Giant's Club"],
+  ['s2', 'sword',  2.10, 0.09, 6500,  'Meč Kostěného knížete', "Bone Prince's Sword"],
+  ['s3', 'hammer', 2.15, 0.09, 7000,  'Kladivo Ohnivého Golema', "Fire Golem's Hammer"],
+  ['m1', 'spear',  2.25, 0.11, 9000,  'Žihadlo Jeskynní matky', "Cave Mother's Stinger"],
+  ['m2', 'wand',   2.30, 0.11, 9500,  'Hůlka Bahenního krále', "Bog King's Wand"],
+  ['m3', 'bow',    2.35, 0.11, 10000, 'Luk Zimní královny', "Winter Queen's Bow"],
+  ['r1', 'scythe', 2.90, 0.14, 15000, 'Kosa Černoboha', "Chernobog's Scythe"],
+];
+for (const [dun, type, dmg, perkVal, price, cs, en] of LEGENDS) ARMS.push({ id: type + '5', type, tier: 5, legend: dun, cs, en, dmg, perk: ARM_TYPES[type].perk, perkVal, need: 1, price });
 export const ARM = Object.fromEntries(ARMS.map((w) => [w.id, w]));
+export const LEGEND_OF = Object.fromEntries(ARMS.filter((w) => w.legend).map((w) => [w.legend, w.id]));
 export const STARTER = 'staff1';          // every character starts with it (free)

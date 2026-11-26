@@ -1,9 +1,0 @@
-[request]
-method = "POST"
-path = "/style.css"
-
-[response]
-status = 405
-
-[response.headers]
-content-type = "application/json"

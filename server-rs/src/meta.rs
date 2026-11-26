@@ -40,6 +40,7 @@ pub struct Profile {
     pub chars: Vec<Char>,
     pub single: usize,
     pub multi: usize,
+    pub bag: Vec<String>,          // spare weapons (boss drops, chest loot), sold or handed to a character
 }
 impl Profile {
     pub fn progress(&self, mode: &str) -> usize { if mode == "single" { self.single } else { self.multi } }
@@ -51,7 +52,7 @@ pub fn new_char(id: i64, name: &str, cls: &str) -> Char {
         arms: BTreeMap::from([(data().starter.clone(), 0)]), held: data().starter.clone() }
 }
 pub fn new_profile() -> Profile {
-    Profile { coins: 0, chars: vec![], single: 1, multi: 1 }
+    Profile { coins: 0, chars: vec![], single: 1, multi: 1, bag: vec![] }
 }
 
 pub fn valid_name(s: &str) -> bool {
@@ -82,6 +83,29 @@ pub fn arm_of(c: &Char) -> (&'static Arm, u32) {
 }
 pub fn arm_dmg(w: &Arm, plus: u32) -> f64 { w.dmg * (1.0 + 0.05 * plus as f64) }
 pub fn arm_up_cost(w: &Arm, plus: u32) -> i64 { js_round(18.0 * w.tier as f64 * ((plus + 1) as f64).powf(1.5)) as i64 }
+/// A sale pays a quarter of the shop price plus 30 % of what was spent on upgrades: a bad rate on purpose.
+pub fn arm_sell(w: &Arm, plus: u32) -> i64 { js_round(0.25 * w.price as f64 + 0.3 * (0..plus).map(|k| arm_up_cost(w, k) as f64).sum::<f64>()) as i64 }
+pub const BAG_MAX: usize = 60;
+/// Puts a dropped weapon in the bag; a full bag sells it on the spot. Returns false when it was sold.
+pub fn add_to_bag(p: &mut Profile, id: &str) -> bool {
+    if p.bag.len() >= BAG_MAX { if let Some(w) = arm(id) { p.coins += arm_sell(w, 0); } return false; }
+    p.bag.push(id.to_string()); true
+}
+fn random_arm(tier: u32) -> String {
+    let all: Vec<&Arm> = data().arms.iter().filter(|a| a.tier == tier).collect();
+    all[rand::random::<u32>() as usize % all.len()].id.clone()
+}
+/// What the boss itself drops on a clear: the weakest weapons (one in a single run, two in a team run, a better one now and then in the raid).
+pub fn boss_drops(d: &data::Dungeon) -> Vec<String> {
+    (0..if d.mode == "multi" { 2 } else { 1 }).map(|_| random_arm(if d.raid && rand::random::<f64>() < 0.35 { 2 } else { 1 })).collect()
+}
+/// The end chest: the dungeon's legendary weapon among a few ordinary ones.
+pub fn chest_items(d: &data::Dungeon) -> Vec<String> {
+    let mut v: Vec<String> = data().legend_of.get(&d.id).cloned().into_iter().collect();
+    let base = if d.raid { 3 } else { 2 };
+    for _ in 0..3 { v.push(random_arm(base + (rand::random::<u32>() % 2))); }
+    v
+}
 
 /// buy | up | equip a held weapon; Some(error) or None after applying the change.
 pub fn arm_error(p: &mut Profile, char_id: i64, op: &str, id: &str) -> Option<&'static str> {
@@ -91,17 +115,45 @@ pub fn arm_error(p: &mut Profile, char_id: i64, op: &str, id: &str) -> Option<&'
     match op {
         "buy" => {
             if has { return Some("owned"); }
+            if w.legend.is_some() { return Some("bad"); }      // a legendary weapon only drops from a chest
             if p.chars[idx].level < w.need { return Some("level"); }
             if p.coins < w.price { return Some("poor"); }
             p.coins -= w.price; p.chars[idx].arms.insert(id.to_string(), 0); None
         }
         "equip" if has => { p.chars[idx].held = id.to_string(); None }
+        "sell" if has => {                // not the one in the hand, not the free starter
+            if p.chars[idx].held == id || id == data().starter { return Some("held"); }
+            let plus = p.chars[idx].arms.remove(id).unwrap_or(0);
+            p.coins += arm_sell(w, plus); None
+        }
         "up" if has => {
             let plus = p.chars[idx].arms[id];
             if plus >= data().consts.max_plus { return Some("max"); }
             let cost = arm_up_cost(w, plus);
             if p.coins < cost { return Some("poor"); }
             p.coins -= cost; p.chars[idx].arms.insert(id.to_string(), plus + 1); None
+        }
+        _ => Some("bad"),
+    }
+}
+
+/// take | sell | sellall on the bag; `i` is the bag slot.
+pub fn bag_error(p: &mut Profile, char_id: i64, op: &str, i: usize) -> Option<&'static str> {
+    match op {
+        "sellall" => {
+            let (keep, sold): (Vec<String>, Vec<String>) = std::mem::take(&mut p.bag).into_iter().partition(|id| arm(id).is_none_or(|w| w.legend.is_some()));
+            p.coins += sold.iter().filter_map(|id| arm(id)).map(|w| arm_sell(w, 0)).sum::<i64>();
+            p.bag = keep; None
+        }
+        "sell" => {
+            let Some(w) = p.bag.get(i).and_then(|id| arm(id)) else { return Some("bad") };
+            p.bag.remove(i); p.coins += arm_sell(w, 0); None
+        }
+        "take" => {
+            let Some(idx) = p.chars.iter().position(|c| c.id == char_id) else { return Some("bad") };
+            let Some(id) = p.bag.get(i).cloned() else { return Some("bad") };
+            if p.chars[idx].arms.contains_key(&id) { return Some("owned"); }
+            p.bag.remove(i); p.chars[idx].arms.insert(id, 0); None
         }
         _ => Some("bad"),
     }
@@ -201,4 +253,41 @@ pub fn create_char(p: &mut Profile, name: &str, cls: &str, id: i64) -> Option<&'
     if p.chars.len() >= data().consts.max_chars { return Some("full"); }
     p.chars.push(new_char(id, name.trim(), cls));
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn profile() -> Profile { let mut p = new_profile(); create_char(&mut p, "Kuba", "perun", 1); p }
+
+    #[test]
+    fn drops_chest_and_merchant() {
+        for d in data().dungeons.iter() {
+            let items = chest_items(d);
+            assert_eq!(items.len(), 4, "legendary + three ordinary");
+            assert_eq!(items[0], data().legend_of[&d.id]);
+            assert!(items[1..].iter().all(|id| arm(id).is_some_and(|w| w.legend.is_none() && w.tier >= 2)));
+            let weak = boss_drops(d);
+            assert_eq!(weak.len(), if d.mode == "multi" { 2 } else { 1 });
+            assert!(weak.iter().all(|id| arm(id).is_some_and(|w| w.tier <= if d.raid { 2 } else { 1 })), "the boss drops the weakest weapons");
+        }
+        let mut p = profile();
+        for id in ["axe1", "club5", "sword2"] { add_to_bag(&mut p, id); }
+        assert_eq!(bag_error(&mut p, 1, "take", 1), None);                    // the legendary club goes to the character
+        assert!(p.chars[0].arms.contains_key("club5") && p.bag == ["axe1", "sword2"]);
+        assert_eq!(bag_error(&mut p, 1, "take", 5), Some("bad"));
+        add_to_bag(&mut p, "club5"); assert_eq!(bag_error(&mut p, 1, "take", 2), Some("owned"));
+        let coins = p.coins; assert_eq!(bag_error(&mut p, 1, "sellall", 0), None);   // a legendary weapon is never sold in bulk
+        assert_eq!(p.bag, ["club5"]); assert_eq!(p.coins, coins + arm_sell(arm("axe1").unwrap(), 0) + arm_sell(arm("sword2").unwrap(), 0));
+        for _ in 0..BAG_MAX { add_to_bag(&mut p, "axe1"); }                    // a full bag sells the next drop at once
+        let coins = p.coins; assert!(!add_to_bag(&mut p, "axe1")); assert!(p.coins > coins && p.bag.len() == BAG_MAX);
+        // selling from a character: bad rate, never the held weapon or the starter
+        p.coins = 1e6 as i64; p.chars[0].level = 50;
+        assert_eq!(arm_error(&mut p, 1, "buy", "axe2"), None); assert_eq!(arm_error(&mut p, 1, "up", "axe2"), None);
+        let paid = arm_sell(arm("axe2").unwrap(), 1); assert!(paid < arm("axe2").unwrap().price / 2);
+        let c = p.coins; assert_eq!(arm_error(&mut p, 1, "sell", "axe2"), None); assert_eq!(p.coins, c + paid);
+        assert_eq!(arm_error(&mut p, 1, "sell", "staff1"), Some("held"));
+        assert_eq!(arm_error(&mut p, 1, "buy", "spear5"), Some("bad"));
+    }
 }

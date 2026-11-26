@@ -10,9 +10,9 @@ const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = `http://127.0.0.1:
 let proc, dir;
 before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'horde-'));
-  // SERVER=rust runs the same tests against the Rust port (cargo build --release in server-rs first)
+  // runs the Rust server (cargo build --release in server-rs first)
   const env = { ...process.env, PORT, DATA_DIR: dir, HOST: '127.0.0.1', RUN_TIME_RATIO: '0', REG_PER_HOUR: '1000', APP_ROOT: process.cwd() };
-  proc = process.env.SERVER === 'rust' ? spawn('server-rs/target/release/horde-server', [], { env, stdio: 'pipe' }) : spawn('node', ['server/server.js'], { env, stdio: 'pipe' });
+  proc = spawn('server-rs/target/release/horde-server', [], { env, stdio: 'pipe' });
   for (let i = 0; i < 50; i++) { try { if ((await fetch(BASE + '/health')).ok) return; } catch { /* not up yet */ } await new Promise((r) => setTimeout(r, 100)); }
   throw new Error('server did not start');
 });
@@ -157,4 +157,22 @@ test('co-op: one connection per account, malformed websocket frames, flood', asy
   await new Promise((r) => setTimeout(r, 300));
   assert.equal((await fetch(BASE + '/health')).status, 200);                                  // still alive
   c2.ws.close();
+});
+
+test('merchant and bag: the profile carries an empty bag, bad sales are refused, the raid starts locked', async () => {
+  const a = await reg('Obchodnik'); await api('POST', 'chars', { name: 'Kupec', cls: 'bohatyr' }, a.token);
+  const me = (await api('GET', 'me', null, a.token)).j.profile; const id = me.chars[0].id;
+  assert.deepEqual(me.bag, []); assert.deepEqual(me.progress, { single: 1, multi: 1 });
+  const arm = (op, wid) => api('POST', 'arm', { charId: id, op, id: wid }, a.token), bag = (op, i) => api('POST', 'bag', { charId: id, op, i }, a.token);
+  assert.equal((await arm('sell', 'staff1')).status, 400);       // the free starter is not for sale
+  assert.equal((await arm('buy', 'club5')).status, 400);         // a legendary weapon cannot be bought
+  assert.equal((await arm('sell', 'sword4')).status, 400);       // not owned
+  assert.equal((await bag('sell', 0)).status, 400); assert.equal((await bag('take', 0)).status, 400); assert.equal((await bag('nope', 0)).status, 400);
+  assert.equal((await bag('sellall')).status, 200);              // an empty bag sells for nothing
+  assert.equal((await api('POST', 'bag', { charId: id, op: 'sell', i: -1 }, a.token)).status, 400);
+  assert.equal((await api('POST', 'bag', { op: 'sell', i: 0 })).status, 401);
+  const H = await wsc(`token=${a.token}&char=${id}`); H.send({ t: 'open' }); await H.next((m) => m.t === 'room');
+  H.send({ t: 'dun', dun: 'r1' }); H.send({ t: 'loot' });         // locked raid: ignored; a chest that is not there: ignored
+  H.send({ t: 'start' }); assert.equal((await H.next((m) => m.t === 'start')).dun, 'm1');
+  H.ws.close();
 });

@@ -9,7 +9,8 @@
   "MAX_PASSIVES": 5,
   "MAX_ITEM_LVL": 8,
   "MAX_EQUIP": 20,
-  "MAX_PLUS": 9
+  "MAX_PLUS": 9,
+  "TEAM_SECONDS": 600
  },
  "classes": [
   {
@@ -363,6 +364,12 @@
    "mode": "single",
    "diff": 1,
    "xp": 1,
+   "secs": 300,
+   "shrines": 0,
+   "pace": 1.1,
+   "spawn": 1,
+   "raid": false,
+   "stages": "single",
    "roster": [
     {
      "arch": "slime",
@@ -402,6 +409,12 @@
    "mode": "single",
    "diff": 1.35,
    "xp": 1.3,
+   "secs": 300,
+   "shrines": 0,
+   "pace": 1.1,
+   "spawn": 1,
+   "raid": false,
+   "stages": "single",
    "roster": [
     {
      "arch": "skel",
@@ -441,6 +454,12 @@
    "mode": "single",
    "diff": 1.8,
    "xp": 1.7,
+   "secs": 300,
+   "shrines": 0,
+   "pace": 1.1,
+   "spawn": 1,
+   "raid": false,
+   "stages": "single",
    "roster": [
     {
      "arch": "imp",
@@ -480,6 +499,12 @@
    "mode": "multi",
    "diff": 1.2,
    "xp": 1.2,
+   "secs": 600,
+   "shrines": 3,
+   "pace": 0.9,
+   "spawn": 1.2,
+   "raid": false,
+   "stages": "team",
    "roster": [
     {
      "arch": "slime",
@@ -519,6 +544,12 @@
    "mode": "multi",
    "diff": 1.5,
    "xp": 1.5,
+   "secs": 600,
+   "shrines": 3,
+   "pace": 0.9,
+   "spawn": 1.2,
+   "raid": false,
+   "stages": "team",
    "roster": [
     {
      "arch": "slime",
@@ -558,6 +589,12 @@
    "mode": "multi",
    "diff": 1.9,
    "xp": 2,
+   "secs": 600,
+   "shrines": 3,
+   "pace": 0.9,
+   "spawn": 1.2,
+   "raid": false,
+   "stages": "team",
    "roster": [
     {
      "arch": "imp",
@@ -591,38 +628,127 @@
     "hp": 5200,
     "scale": 2.8
    }
-  }
- ],
- "pace": 1.1,
- "boss_stages": [
-  {
-   "at": 60,
-   "hp": 0.05,
-   "dmg": 0.5,
-   "size": 0.6,
-   "ring": 6,
-   "minions": 2,
-   "every": 12
   },
   {
-   "at": 180,
-   "hp": 0.25,
-   "dmg": 0.7,
-   "size": 0.8,
-   "ring": 9,
-   "minions": 4,
-   "every": 10
-  },
-  {
-   "at": 300,
-   "hp": 0.7,
-   "dmg": 1,
-   "size": 1,
-   "ring": 14,
-   "minions": 6,
-   "every": 8
+   "id": "r1",
+   "mode": "multi",
+   "diff": 3.2,
+   "xp": 4,
+   "secs": 600,
+   "shrines": 4,
+   "pace": 1,
+   "spawn": 1.45,
+   "raid": true,
+   "stages": "team",
+   "roster": [
+    {
+     "arch": "ghost",
+     "at": 0,
+     "weight": 5
+    },
+    {
+     "arch": "imp",
+     "at": 0,
+     "weight": 4
+    },
+    {
+     "arch": "wolf",
+     "at": 40,
+     "weight": 3
+    },
+    {
+     "arch": "spider",
+     "at": 90,
+     "weight": 3
+    },
+    {
+     "arch": "boar",
+     "at": 150,
+     "weight": 2.5
+    },
+    {
+     "arch": "ogre",
+     "at": 220,
+     "weight": 1.5
+    }
+   ],
+   "elite": "ogre",
+   "boss": {
+    "arch": "ogre",
+    "hp": 9000,
+    "scale": 3.4
+   }
   }
  ],
+ "boss_stages": {
+  "single": [
+   {
+    "at": 60,
+    "hp": 0.05,
+    "dmg": 0.5,
+    "size": 0.6,
+    "ring": 6,
+    "minions": 2,
+    "every": 12
+   },
+   {
+    "at": 180,
+    "hp": 0.25,
+    "dmg": 0.7,
+    "size": 0.8,
+    "ring": 9,
+    "minions": 4,
+    "every": 10
+   },
+   {
+    "at": 300,
+    "hp": 0.7,
+    "dmg": 1,
+    "size": 1,
+    "ring": 14,
+    "minions": 6,
+    "every": 8
+   }
+  ],
+  "team": [
+   {
+    "at": 120,
+    "hp": 0.1,
+    "dmg": 0.5,
+    "size": 0.6,
+    "ring": 8,
+    "minions": 3,
+    "every": 12
+   },
+   {
+    "at": 330,
+    "hp": 0.4,
+    "dmg": 0.7,
+    "size": 0.8,
+    "ring": 11,
+    "minions": 5,
+    "every": 10
+   },
+   {
+    "at": 540,
+    "hp": 1,
+    "dmg": 1,
+    "size": 1,
+    "ring": 16,
+    "minions": 8,
+    "every": 8
+   }
+  ]
+ },
+ "legend_of": {
+  "s1": "club5",
+  "s2": "sword5",
+  "s3": "hammer5",
+  "m1": "spear5",
+  "m2": "wand5",
+  "m3": "bow5",
+  "r1": "scythe5"
+ },
  "slots": [
   "armor",
   "ring",
@@ -637,7 +763,8 @@
    "perk": "hp",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "sword2",
@@ -646,7 +773,8 @@
    "perk": "hp",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "sword3",
@@ -655,7 +783,8 @@
    "perk": "hp",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "sword4",
@@ -664,7 +793,8 @@
    "perk": "hp",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "dagger1",
@@ -673,7 +803,8 @@
    "perk": "spd",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "dagger2",
@@ -682,7 +813,8 @@
    "perk": "spd",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "dagger3",
@@ -691,7 +823,8 @@
    "perk": "spd",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "dagger4",
@@ -700,7 +833,8 @@
    "perk": "spd",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "axe1",
@@ -709,7 +843,8 @@
    "perk": null,
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "axe2",
@@ -718,7 +853,8 @@
    "perk": null,
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "axe3",
@@ -727,7 +863,8 @@
    "perk": null,
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "axe4",
@@ -736,7 +873,8 @@
    "perk": null,
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "hammer1",
@@ -745,7 +883,8 @@
    "perk": "hp",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "hammer2",
@@ -754,7 +893,8 @@
    "perk": "hp",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "hammer3",
@@ -763,7 +903,8 @@
    "perk": "hp",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "hammer4",
@@ -772,7 +913,8 @@
    "perk": "hp",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "mace1",
@@ -781,7 +923,8 @@
    "perk": "magnet",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "mace2",
@@ -790,7 +933,8 @@
    "perk": "magnet",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "mace3",
@@ -799,7 +943,8 @@
    "perk": "magnet",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "mace4",
@@ -808,7 +953,8 @@
    "perk": "magnet",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "spear1",
@@ -817,7 +963,8 @@
    "perk": "magnet",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "spear2",
@@ -826,7 +973,8 @@
    "perk": "magnet",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "spear3",
@@ -835,7 +983,8 @@
    "perk": "magnet",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "spear4",
@@ -844,7 +993,8 @@
    "perk": "magnet",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "staff1",
@@ -853,7 +1003,8 @@
    "perk": "cd",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "staff2",
@@ -862,7 +1013,8 @@
    "perk": "cd",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "staff3",
@@ -871,7 +1023,8 @@
    "perk": "cd",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "staff4",
@@ -880,7 +1033,8 @@
    "perk": "cd",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "wand1",
@@ -889,7 +1043,8 @@
    "perk": "cd",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "wand2",
@@ -898,7 +1053,8 @@
    "perk": "cd",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "wand3",
@@ -907,7 +1063,8 @@
    "perk": "cd",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "wand4",
@@ -916,7 +1073,8 @@
    "perk": "cd",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "scythe1",
@@ -925,7 +1083,8 @@
    "perk": "magnet",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "scythe2",
@@ -934,7 +1093,8 @@
    "perk": "magnet",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "scythe3",
@@ -943,7 +1103,8 @@
    "perk": "magnet",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "scythe4",
@@ -952,7 +1113,8 @@
    "perk": "magnet",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "club1",
@@ -961,7 +1123,8 @@
    "perk": "hp",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "club2",
@@ -970,7 +1133,8 @@
    "perk": "hp",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "club3",
@@ -979,7 +1143,8 @@
    "perk": "hp",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "club4",
@@ -988,7 +1153,8 @@
    "perk": "hp",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "bow1",
@@ -997,7 +1163,8 @@
    "perk": "spd",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "bow2",
@@ -1006,7 +1173,8 @@
    "perk": "spd",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "bow3",
@@ -1015,7 +1183,8 @@
    "perk": "spd",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "bow4",
@@ -1024,7 +1193,8 @@
    "perk": "spd",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
   },
   {
    "id": "flail1",
@@ -1033,7 +1203,8 @@
    "perk": "spd",
    "perk_val": 0.02,
    "need": 1,
-   "price": 120
+   "price": 120,
+   "legend": null
   },
   {
    "id": "flail2",
@@ -1042,7 +1213,8 @@
    "perk": "spd",
    "perk_val": 0.035,
    "need": 8,
-   "price": 600
+   "price": 600,
+   "legend": null
   },
   {
    "id": "flail3",
@@ -1051,7 +1223,8 @@
    "perk": "spd",
    "perk_val": 0.05,
    "need": 20,
-   "price": 2200
+   "price": 2200,
+   "legend": null
   },
   {
    "id": "flail4",
@@ -1060,7 +1233,78 @@
    "perk": "spd",
    "perk_val": 0.07,
    "need": 40,
-   "price": 6000
+   "price": 6000,
+   "legend": null
+  },
+  {
+   "id": "club5",
+   "tier": 5,
+   "dmg": 2.05,
+   "perk": "hp",
+   "perk_val": 0.09,
+   "need": 1,
+   "price": 6000,
+   "legend": "s1"
+  },
+  {
+   "id": "sword5",
+   "tier": 5,
+   "dmg": 2.1,
+   "perk": "hp",
+   "perk_val": 0.09,
+   "need": 1,
+   "price": 6500,
+   "legend": "s2"
+  },
+  {
+   "id": "hammer5",
+   "tier": 5,
+   "dmg": 2.15,
+   "perk": "hp",
+   "perk_val": 0.09,
+   "need": 1,
+   "price": 7000,
+   "legend": "s3"
+  },
+  {
+   "id": "spear5",
+   "tier": 5,
+   "dmg": 2.25,
+   "perk": "magnet",
+   "perk_val": 0.11,
+   "need": 1,
+   "price": 9000,
+   "legend": "m1"
+  },
+  {
+   "id": "wand5",
+   "tier": 5,
+   "dmg": 2.3,
+   "perk": "cd",
+   "perk_val": 0.11,
+   "need": 1,
+   "price": 9500,
+   "legend": "m2"
+  },
+  {
+   "id": "bow5",
+   "tier": 5,
+   "dmg": 2.35,
+   "perk": "spd",
+   "perk_val": 0.11,
+   "need": 1,
+   "price": 10000,
+   "legend": "m3"
+  },
+  {
+   "id": "scythe5",
+   "tier": 5,
+   "dmg": 2.9,
+   "perk": "magnet",
+   "perk_val": 0.14,
+   "need": 1,
+   "price": 15000,
+   "legend": "r1"
   }
  ]
 }

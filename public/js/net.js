@@ -58,6 +58,9 @@ export const profile = {
     if (this.isGuest) { const err = armError(this.p, charId, op, id); if (err) throw new Error(err); store.save(); return; }
     this.p = (await call('POST', 'arm', { charId, op, id })).profile;
   },
+  async bag(charId, op, i) {                    // take | sell | sellall on the bag of spare weapons (accounts only)
+    this.p = (await call('POST', 'bag', { charId, op, i })).profile;
+  },
   // guests only: their progress lives in this browser. Signed-in runs are simulated and paid out by the server.
   runFinishLocal(charId, r) {
     const before = this.p.chars.find((c) => c.id === charId)?.level || 1;

@@ -20,19 +20,26 @@ export function fixArms(c) {
 export const armOf = (c) => { const w = armById(c.held) && Object.hasOwn(c.arms || {}, c.held) ? ARM[c.held] : ARM[STARTER]; return [w, Object.hasOwn(c.arms || {}, w.id) ? c.arms[w.id] : 0]; };
 export const armDmg = (w, plus) => w.dmg * (1 + 0.05 * plus);
 export const armUpCost = (w, plus) => Math.round(18 * w.tier * Math.pow(plus + 1, 1.5));
-export function armError(profile, charId, op, id) {      // buy | up | equip; returns an error string or null and applies the change
+// a sale pays a quarter of the shop price plus 30 % of what was spent on upgrades: a bad rate on purpose
+export const armSell = (w, plus) => Math.round(0.25 * w.price + 0.3 * Array.from({ length: plus }, (_, k) => armUpCost(w, k)).reduce((a, b) => a + b, 0));
+export function armError(profile, charId, op, id) {      // buy | up | equip | sell; returns an error string or null and applies the change
   const c = profile.chars.find((x) => x.id === charId), w = armById(id);
   if (!c || !w) return 'bad';
   fixArms(c);
   const has = Object.hasOwn(c.arms, id);
   if (op === 'buy') {
     if (has) return 'owned';
+    if (w.legend) return 'bad';                // a legendary weapon only drops from a chest
     if (c.level < w.need) return 'level';
     if (profile.coins < w.price) return 'poor';
     profile.coins -= w.price; c.arms[id] = 0; return null;
   }
   if (!has) return 'bad';
   if (op === 'equip') { c.held = id; return null; }
+  if (op === 'sell') {                           // not the one in the hand, not the free starter
+    if (c.held === id || id === STARTER) return 'held';
+    profile.coins += armSell(w, c.arms[id]); delete c.arms[id]; return null;
+  }
   if (op === 'up') {
     const plus = c.arms[id];
     if (plus >= MAX_PLUS) return 'max';

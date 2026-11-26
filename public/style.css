@@ -107,3 +107,17 @@ button.card .ic { grid-row: span 2; } button.card .ic canvas { width: 44px; heig
 .btn.locked { background: #4a4560; color: #8a85a0; box-shadow: 0 -3px 0 #2c2840, 0 3px 0 #2c2840, -3px 0 0 #2c2840, 3px 0 0 #2c2840; cursor: not-allowed; }
 .popup { position: fixed; inset: 0; background: #000b; display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 50; } .popup .card { max-width: 340px; text-align: center; display: flex; flex-direction: column; gap: 10px; } .popup h3 { color: var(--gold); font-size: 20px; margin: 0; } .popup p { color: var(--text); margin: 0; font-size: 15px; }
 [data-act=snd] { font-size: 26px; line-height: 1; } [data-act=snd] .mute { inset: 6px; } [data-act=snd] .mute::before, [data-act=snd] .mute::after { opacity: .9; }
+
+/* team dungeons, merchant, chest */
+.armdetail.t5 b, .gold { color: #ffd23f; } .armdetail.t5 { box-shadow: 0 0 0 2px #ffd23f; }
+.atile.t5 { box-shadow: 0 0 0 2px #ffd23f; } .atile.t4 { box-shadow: 0 0 0 1px #ff7ae0; }
+.dun.raid { box-shadow: 0 0 0 2px #b020f0; } .dun.raid b { color: #e6a8ff; }
+.baggrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; } .baggrid .atile { min-height: 58px; }
+.baggrid .note { grid-column: 1 / -1; }
+.loot { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin: 6px 0; } .loot > span { flex-basis: 100%; text-align: center; color: var(--dim); font-size: 14px; }
+.loot .atile { width: 64px; min-height: 0; cursor: default; padding: 2px 2px 3px; } .loot .atile small { font-size: 10px; line-height: 1; text-align: center; color: var(--text); }
+.card.chest { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; } .card.chest.taken { opacity: .9; }
+.btn.gold { background: #ffd23f; color: #3a2a00; }
+.shr { top: 62px; left: 136px; text-shadow: 2px 2px 0 #000; font-size: 20px; color: #ffd23f; }
+.bossbar.shield i { background: #3a8ac8; } .bossbar.shield b { color: #bfeaff; }
+.stats .loot { justify-content: center; gap: 22px; }

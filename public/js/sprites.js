@@ -1,5 +1,5 @@
 // Procedural pixel art: heroes, enemies, items, ground and a tiny 3x5 text font. All sprites are drawn once into small canvases.
-import { CLASS, DUNGEON, ARCH, ARM_TYPES, BOSS_STAGES } from '../shared/data.js';
+import { CLASS, DUNGEON, ARCH, ARM_TYPES } from '../shared/data.js';
 
 const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 const OUT = [17, 17, 17];
@@ -56,7 +56,7 @@ export function enemySprite(arch, pal) {
 }
 // radius of an enemy of this dungeon type, as the sim computes it
 export function enemyRadius(d, type) {
-  if (type >= 6) return ARCH[d.boss.arch].r * (d.boss.scale || 2.6) * BOSS_STAGES[type - 6].size;
+  if (type >= 6) return ARCH[d.boss.arch].r * (d.boss.scale || 2.6) * d.stages[type - 6].size;
   if (type === 5) return ARCH[d.elite[0]].r * 1.5;
   return ARCH[d.roster[type][0]].r;
 }
@@ -127,12 +127,14 @@ const ARM_METAL = [
   { b: '#b8c4d0', e: '#eaf2fa', g: '#c9a05a', h: '#6b4420', k: '#2a1a10', j: '#c9a05a' },
   { b: '#d6dce4', e: '#ffffff', g: '#e8b830', h: '#7a2a2a', k: '#3a1010', j: '#e03030' },
   { b: '#7ad8f0', e: '#e8feff', g: '#b070f0', h: '#2a2a5a', k: '#10102a', j: '#ff5adf' },
+  { b: '#ffcf3a', e: '#fff6c0', g: '#d8281e', h: '#5a1010', k: '#2a0606', j: '#6cf0ff' },      // legendary
 ];
 const ARM_WOOD = [
   { b: '#a0702e', e: '#c99a54', g: '#6b4a2a', h: '#8a5a2a', k: '#4a3018', j: '#c9a05a' },
   { b: '#7a4a22', e: '#a06a38', g: '#8d949a', h: '#6b4420', k: '#2a1a10', j: '#8d949a' },
   { b: '#4a2a14', e: '#7a5030', g: '#e8b830', h: '#7a2a2a', k: '#3a1010', j: '#e03030' },
   { b: '#4a3a8a', e: '#8a70e0', g: '#7ad8f0', h: '#2a2a5a', k: '#10102a', j: '#ff5adf' },
+  { b: '#ffcf3a', e: '#fff6c0', g: '#d8281e', h: '#5a1010', k: '#2a0606', j: '#6cf0ff' },      // legendary
 ];
 const armCache = new Map();
 export function armSprite(id) {                 // id like 'sword3' = type + tier

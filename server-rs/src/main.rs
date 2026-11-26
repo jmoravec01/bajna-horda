@@ -17,7 +17,7 @@ use db::Db;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use futures_util::{SinkExt, StreamExt};
-use meta::{arm_error, create_char, upgrade_equip, valid_name, Profile};
+use meta::{arm_error, bag_error, create_char, upgrade_equip, valid_name, Profile};
 use rooms::{Hub, Out, Who};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -85,7 +85,7 @@ impl App {
     fn profile_json(p: &Profile) -> Value {
         let chars: Vec<Value> = p.chars.iter().map(|c| json!({"id": c.id, "name": c.name, "cls": c.cls, "level": c.level, "xp": c.xp,
             "equip": {"armor": c.equip.armor, "ring": c.equip.ring, "boots": c.equip.boots}, "arms": c.arms, "held": c.held})).collect();
-        json!({"coins": p.coins, "chars": chars, "progress": {"single": p.single, "multi": p.multi}})
+        json!({"coins": p.coins, "chars": chars, "progress": {"single": p.single, "multi": p.multi}, "bag": p.bag})
     }
     fn profile(&self, uid: i64) -> Result<Profile, ApiErr> { self.db.load_profile(uid).ok_or(ApiErr(500, "server")) }
     fn session(&self, id: i64) -> ApiResult {
@@ -161,6 +161,16 @@ async fn api(app: &Arc<App>, method: &Method, path: &str, headers: &HeaderMap, a
             let cid = b.get("charId").and_then(is_integer).unwrap_or(i64::MIN);
             let (op, id) = (b.get("op").and_then(|v| v.as_str()).unwrap_or(""), b.get("id").and_then(|v| v.as_str()).unwrap_or(""));
             if let Some(err) = arm_error(&mut p, cid, op, id) { return Err(ApiErr(400, err)); }
+            app.db.save_profile(u.id, &p).map_err(|_| ApiErr(500, "server"))?;
+            Ok(json!({"profile": App::profile_json(&p)}))
+        }
+        ("POST", "bag") => {                      // take | sell | sellall: the bag of spare weapons
+            let u = app.need(headers)?; let b = read_json(body).await?;
+            let mut p = app.profile(u.id)?;
+            let cid = b.get("charId").and_then(is_integer).unwrap_or(i64::MIN);
+            let op = b.get("op").and_then(|v| v.as_str()).unwrap_or("");
+            let i = b.get("i").and_then(is_integer).filter(|i| *i >= 0).unwrap_or(i64::MAX) as usize;
+            if let Some(err) = bag_error(&mut p, cid, op, i) { return Err(ApiErr(400, err)); }
             app.db.save_profile(u.id, &p).map_err(|_| ApiErr(500, "server"))?;
             Ok(json!({"profile": App::profile_json(&p)}))
         }

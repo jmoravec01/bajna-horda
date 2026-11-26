@@ -1,7 +1,7 @@
 // Co-op rooms (port of server/rooms.js). Every account owns one room (its code); friends connect to it over a WebSocket.
 use crate::data::{data, dungeon};
 use crate::db::Db;
-use crate::meta::{apply_run, new_char, power, valid_name, Char, RunResult};
+use crate::meta::{add_to_bag, apply_run, boss_drops, chest_items, new_char, power, valid_name, Char, RunResult};
 use crate::sim::{Ev, Sim, SimPlayerIn};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -14,13 +14,16 @@ pub enum Out { Text(String), Close(u16), Ping }
 
 struct Member {
     id: u64, tx: Sender<Out>, user_id: Option<i64>, name: String, cls: String, ch: Option<Char>, room: Option<String>, pid: u32, left: bool,
-    msgs: u32, tick: Instant, last_seen: Instant, born: Instant, misses: u8, ip: String,
+    msgs: u32, tick: Instant, last_seen: Instant, born: Instant, misses: u8, ip: String, chest: Option<u64>,
 }
+/// The end-of-run chest (20 % after a clear): every player of the run sees it, the first one to open it takes everything.
+struct Chest { items: Vec<String>, members: Vec<u64>, by: Option<String>, born: Instant }
+const CHEST_SECS: u64 = 120;
 struct Room {
     code: String, owner_id: i64, owner_name: String, members: Vec<u64>, running: bool, dun: String, sim: Option<Sim>, evbuf: Vec<Ev>, last: Instant, acc: f64, gen: u64, solo: bool,
 }
 #[derive(Default)]
-struct State { ip_miss: HashMap<String, (u32, Instant)>, rooms: HashMap<String, Room>, members: HashMap<u64, Member>, by_user: HashMap<i64, u64>, next_id: u64, next_gen: u64 }
+struct State { ip_miss: HashMap<String, (u32, Instant)>, rooms: HashMap<String, Room>, members: HashMap<u64, Member>, by_user: HashMap<i64, u64>, next_id: u64, next_gen: u64, chests: HashMap<u64, Chest>, next_chest: u64 }
 
 #[derive(Clone)]
 pub struct Hub { st: Arc<Mutex<State>>, db: Arc<Db> }
@@ -48,7 +51,7 @@ impl Hub {
             Some(uid) => (if who.char_id != 0 { self.db.get_char(who.char_id, uid) } else { None }).or_else(|| self.db.load_profile(uid).and_then(|p| p.chars.into_iter().next())),
             None => Some(new_char(0, &who.name, &who.cls)),   // guests join with a fresh level-1 character
         };
-        s.members.insert(id, Member { id, tx, user_id: who.user_id, name: who.name, cls: who.cls, ch, room: None, pid: 0, left: false, msgs: 0, tick: Instant::now(), last_seen: Instant::now(), born: Instant::now(), misses: 0, ip: who.ip });
+        s.members.insert(id, Member { id, tx, user_id: who.user_id, name: who.name, cls: who.cls, ch, room: None, pid: 0, left: false, msgs: 0, tick: Instant::now(), last_seen: Instant::now(), born: Instant::now(), misses: 0, ip: who.ip, chest: None });
         id
     }
 
@@ -60,9 +63,11 @@ impl Hub {
     pub fn touch(&self, id: u64) { if let Some(m) = self.lock().members.get_mut(&id) { m.last_seen = Instant::now(); } }
 
     pub fn heartbeat(&self) {
-        let s = self.lock();
+        let mut s = self.lock();
+        s.chests.retain(|_, c| c.born.elapsed().as_secs() < CHEST_SECS);
         for m in s.members.values() {
-            if m.last_seen.elapsed().as_secs() > 70 || (m.room.is_none() && m.born.elapsed().as_secs() > 45) { let _ = m.tx.try_send(Out::Close(1001)); } else { let _ = m.tx.try_send(Out::Ping); }
+            let waits_for_chest = m.chest.is_some_and(|c| s.chests.contains_key(&c));
+            if m.last_seen.elapsed().as_secs() > 70 || (m.room.is_none() && m.born.elapsed().as_secs() > 45 && !waits_for_chest) { let _ = m.tx.try_send(Out::Close(1001)); } else { let _ = m.tx.try_send(Out::Ping); }
         }
     }
 
@@ -117,6 +122,7 @@ impl Hub {
                 let ok = s.rooms.get(&code).map(|r| !r.running && self.is_host(&s, r, id)).unwrap_or(false);
                 if ok { self.start_run(&mut s, &code); }
             }
+            "loot" => self.loot(&mut s, id),
             "leave" => self.leave_locked(&mut s, id),
             _ => {}
         }
@@ -259,35 +265,105 @@ impl Hub {
     fn end_run(&self, s: &mut State, code: &str) {
         let (sim, dun, members) = { let r = s.rooms.get_mut(code).unwrap(); (r.sim.take().unwrap(), r.dun.clone(), r.members.clone()) };
         let over = sim.over.as_ref().unwrap();
+        let d = dungeon(&dun).expect("dungeon");
+        // a cleared run: 20 % chance of a chest with the dungeon's legendary weapon, visible to everyone in the run
+        let chest = if over.cleared && rand::random::<f64>() < 0.2 {
+            s.next_chest += 1; let cid = s.next_chest;
+            let items = chest_items(d);
+            s.chests.insert(cid, Chest { items: items.clone(), members: members.clone(), by: None, born: Instant::now() });
+            Some((cid, items))
+        } else { None };
         for mid in members {
             let (pid, user_id, ch) = { let m = &s.members[&mid]; (m.pid, m.user_id, m.ch.clone()) };
             let r = over.players.get((pid as usize).wrapping_sub(1));
-            let (mut reward, mut level_up, mut level) = (json!({}), 0i64, ch.as_ref().map(|c| c.level).unwrap_or(1) as i64);
+            let (mut reward, mut level_up, mut level, mut drops) = (json!({}), 0i64, ch.as_ref().map(|c| c.level).unwrap_or(1) as i64, Vec::<String>::new());
             if let (Some(uid), Some(c), Some(r)) = (user_id, ch.as_ref(), r) {
                 if c.id != 0 {
                     if let Some(mut prof) = self.db.load_profile(uid) {
                         let before = prof.chars.iter().find(|q| q.id == c.id).map(|q| q.level as i64).unwrap_or(1);
-                        if let Some(rw) = apply_run(&mut prof, c.id, &RunResult { dungeon_id: &dun, kills: r.kills as f64, coins_picked: r.coins, time_sec: over.time, cleared: over.cleared && r.kills > 0, reward_mul: r.reward }) {   /* an idle alt (0 kills) gets no clear bonus */
+                        let cleared = over.cleared && r.kills > 0;     // an idle alt does not get the clear
+                        if let Some(rw) = apply_run(&mut prof, c.id, &RunResult { dungeon_id: &dun, kills: r.kills as f64, coins_picked: r.coins, time_sec: over.time, cleared, reward_mul: r.reward }) {
                             reward = json!({"xp": rw.xp, "coins": rw.coins});
+                            if cleared { drops = boss_drops(d); for w in &drops { add_to_bag(&mut prof, w); } }
                             if self.db.save_profile(uid, &prof).is_ok() {
                                 level = prof.chars.iter().find(|q| q.id == c.id).map(|q| q.level as i64).unwrap_or(before);
                                 level_up = level - before;
                                 if let Some(nc) = self.db.get_char(c.id, uid) { s.members.get_mut(&mid).unwrap().ch = Some(nc); }
-                            }
+                            } else { drops.clear(); }
                         }
                     }
                 }
             }
             let m = s.members.get_mut(&mid).unwrap();
-            send(m, json!({"t": "end", "over": {"cleared": over.cleared, "time": over.time}, "kills": r.map(|x| x.kills).unwrap_or(0), "reward": reward, "levelUp": level_up, "level": level, "carry": r.map(|x| x.reward).unwrap_or(1.0)}));
+            m.chest = chest.as_ref().map(|c| c.0);
+            send(m, json!({"t": "end", "over": {"cleared": over.cleared, "time": over.time}, "kills": r.map(|x| x.kills).unwrap_or(0), "reward": reward, "levelUp": level_up, "level": level, "carry": r.map(|x| x.reward).unwrap_or(1.0),
+                "drops": drops, "chest": chest.as_ref().map(|c| json!({"items": c.1}))}));
             m.pid = 0;
         }
-        let _ = dungeon(&dun);
         if s.rooms.get(code).map(|r| r.solo).unwrap_or(false) { s.rooms.remove(code); return; }
         s.rooms.get_mut(code).unwrap().running = false;
         self.broadcast(s, code);
+    }
+
+    /// The first player to open the chest takes everything in it; the others only see what it held.
+    fn loot(&self, s: &mut State, id: u64) {
+        let Some(cid) = s.members.get(&id).and_then(|m| m.chest) else { return };
+        let Some(chest) = s.chests.get(&cid) else { return };
+        if chest.by.is_some() { return; }
+        let Some(uid) = s.members.get(&id).and_then(|m| m.user_id) else {
+            if let Some(m) = s.members.get(&id) { send(m, json!({"t": "err", "code": "need_account"})); }
+            return;
+        };
+        let (items, members) = (chest.items.clone(), chest.members.clone());
+        let Some(mut prof) = self.db.load_profile(uid) else { return };
+        for w in &items { add_to_bag(&mut prof, w); }
+        if self.db.save_profile(uid, &prof).is_err() { return; }
+        let by = s.members[&id].name.clone();
+        s.chests.get_mut(&cid).unwrap().by = Some(by.clone());
+        for mid in members {
+            if let Some(m) = s.members.get(&mid) { send(m, json!({"t": "looted", "by": by, "items": items, "mine": mid == id})); }
+        }
     }
 }
 
 fn send(m: &Member, v: Value) { let _ = m.tx.try_send(Out::Text(v.to_string())); }
 pub fn guest_name(nick: &str) -> String { if valid_name(nick) { nick.trim().to_string() } else { "Host".to_string() } }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn player(hub: &Hub, db: &Db, name: &str) -> (u64, i64, tokio::sync::mpsc::Receiver<Out>) {
+        let uid = db.create_user(name, "x").unwrap(); db.insert_char(uid, name, "perun");
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        (hub.connect(tx, Who { user_id: Some(uid), name: name.into(), cls: "perun".into(), char_id: 0, ip: "t".into() }), uid, rx)
+    }
+    fn texts(rx: &mut tokio::sync::mpsc::Receiver<Out>) -> Vec<Value> { let mut v = vec![]; while let Ok(o) = rx.try_recv() { if let Out::Text(t) = o { v.push(serde_json::from_str(&t).unwrap()); } } v }
+
+    #[test]
+    fn the_first_to_open_the_chest_takes_everything_and_the_others_only_see_it() {
+        let db = Arc::new(Db::open(":memory:").unwrap()); let hub = Hub::new(db.clone());
+        let (a, ua, mut ra) = player(&hub, &db, "Anna"); let (b, ub, mut rb) = player(&hub, &db, "Bara");
+        let items = vec!["club5".to_string(), "axe2".to_string(), "sword2".to_string(), "mace3".to_string()];
+        { let mut s = hub.lock();
+          s.chests.insert(7, Chest { items: items.clone(), members: vec![a, b], by: None, born: Instant::now() });
+          for id in [a, b] { s.members.get_mut(&id).unwrap().chest = Some(7); } }
+        hub.handle(b, r#"{"t":"loot"}"#); hub.handle(a, r#"{"t":"loot"}"#); hub.handle(b, r#"{"t":"loot"}"#);
+        let (ma, mb) = (texts(&mut ra), texts(&mut rb));
+        assert_eq!(ma.len(), 1); assert_eq!(mb.len(), 1);                                   // one answer each, the late clicks do nothing
+        assert_eq!((ma[0]["by"].as_str(), ma[0]["mine"].as_bool()), (Some("Bara"), Some(false)));
+        assert_eq!((mb[0]["by"].as_str(), mb[0]["mine"].as_bool()), (Some("Bara"), Some(true)));
+        assert_eq!(mb[0]["items"].as_array().unwrap().len(), 4);                           // everyone sees what fell
+        assert_eq!(db.load_profile(ub).unwrap().bag, items); assert!(db.load_profile(ua).unwrap().bag.is_empty());
+    }
+
+    #[test]
+    fn a_guest_cannot_take_a_chest() {
+        let db = Arc::new(Db::open(":memory:").unwrap()); let hub = Hub::new(db.clone());
+        let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+        let g = hub.connect(tx, Who { user_id: None, name: "Gast".into(), cls: "perun".into(), char_id: 0, ip: "t".into() });
+        { let mut s = hub.lock(); s.chests.insert(1, Chest { items: vec!["club5".into()], members: vec![g], by: None, born: Instant::now() }); s.members.get_mut(&g).unwrap().chest = Some(1); }
+        hub.handle(g, r#"{"t":"loot"}"#);
+        assert_eq!(texts(&mut rx)[0]["code"], "need_account"); assert!(hub.lock().chests[&1].by.is_none());
+    }
+}
