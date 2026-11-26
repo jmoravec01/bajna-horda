@@ -5,6 +5,7 @@ use crate::meta::{apply_run, new_char, power, valid_name, Char, RunResult};
 use crate::sim::{Ev, Sim, SimPlayerIn};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use rand::RngCore;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::mpsc::Sender;
@@ -13,18 +14,18 @@ pub enum Out { Text(String), Close(u16), Ping }
 
 struct Member {
     id: u64, tx: Sender<Out>, user_id: Option<i64>, name: String, cls: String, ch: Option<Char>, room: Option<String>, pid: u32, left: bool,
-    msgs: u32, tick: Instant, last_seen: Instant, born: Instant, misses: u8,
+    msgs: u32, tick: Instant, last_seen: Instant, born: Instant, misses: u8, ip: String,
 }
 struct Room {
     code: String, owner_id: i64, owner_name: String, members: Vec<u64>, running: bool, dun: String, sim: Option<Sim>, evbuf: Vec<Ev>, last: Instant, acc: f64, gen: u64,
 }
 #[derive(Default)]
-struct State { rooms: HashMap<String, Room>, members: HashMap<u64, Member>, by_user: HashMap<i64, u64>, next_id: u64, next_gen: u64 }
+struct State { ip_miss: HashMap<String, (u32, Instant)>, rooms: HashMap<String, Room>, members: HashMap<u64, Member>, by_user: HashMap<i64, u64>, next_id: u64, next_gen: u64 }
 
 #[derive(Clone)]
 pub struct Hub { st: Arc<Mutex<State>>, db: Arc<Db> }
 
-pub struct Who { pub user_id: Option<i64>, pub name: String, pub cls: String, pub char_id: i64 }
+pub struct Who { pub user_id: Option<i64>, pub name: String, pub cls: String, pub char_id: i64, pub ip: String }
 
 impl Hub {
     pub fn new(db: Arc<Db>) -> Hub { Hub { st: Arc::new(Mutex::new(State { next_id: 1, ..Default::default() })), db } }
@@ -47,7 +48,7 @@ impl Hub {
             Some(uid) => (if who.char_id != 0 { self.db.get_char(who.char_id, uid) } else { None }).or_else(|| self.db.load_profile(uid).and_then(|p| p.chars.into_iter().next())),
             None => Some(new_char(0, &who.name, &who.cls)),   // guests join with a fresh level-1 character
         };
-        s.members.insert(id, Member { id, tx, user_id: who.user_id, name: who.name, cls: who.cls, ch, room: None, pid: 0, left: false, msgs: 0, tick: Instant::now(), last_seen: Instant::now(), born: Instant::now(), misses: 0 });
+        s.members.insert(id, Member { id, tx, user_id: who.user_id, name: who.name, cls: who.cls, ch, room: None, pid: 0, left: false, msgs: 0, tick: Instant::now(), last_seen: Instant::now(), born: Instant::now(), misses: 0, ip: who.ip });
         id
     }
 
@@ -79,6 +80,7 @@ impl Hub {
         let room_code = s.members.get(&id).and_then(|m| m.room.clone());
         match t {
             "ping" => { let n = num("n"); let n = if n.is_finite() && n != 0.0 { n } else { 0.0 }; if let Some(m) = s.members.get(&id) { send(m, json!({"t": "pong", "n": n})); } }
+            "open" => self.open(&mut s, id),
             "join" => { let code: String = d.get("code").and_then(|v| v.as_str()).unwrap_or("").to_uppercase().chars().take(8).collect(); self.join(&mut s, id, &code); }
             "in" => {
                 if let (Some(code), Some(m)) = (room_code, s.members.get(&id)) {
@@ -134,23 +136,35 @@ impl Hub {
         for mid in &room.members { if let Some(m) = s.members.get(mid) { send(m, self.room_msg(s, room, m.id)); } }
     }
 
+    // A world is found by three hero faces: 3 letters A..L, one per class. 12^3 = 1728 combinations,
+    // so guessing is throttled per socket (5 misses) and per IP (20 misses / 10 min).
+    fn open(&self, s: &mut State, id: u64) {
+        let (has_room, has_char, user_id, name) = { let m = s.members.get(&id).unwrap(); (m.room.is_some(), m.ch.is_some(), m.user_id, m.name.clone()) };
+        if has_room { return; }
+        let err = |s: &State, c: &str| { if let Some(m) = s.members.get(&id) { send(m, json!({"t": "err", "code": c})); } };
+        let Some(uid) = user_id else { return err(s, "need_account") };
+        if !has_char { return err(s, "need_char"); }
+        let mut rng = rand::rng();
+        let code = (0..200).map(|_| (0..3).map(|_| (b'A' + (rng.next_u32() % 12) as u8) as char).collect::<String>()).find(|c| !s.rooms.contains_key(c));
+        let Some(code) = code else { return err(s, "full_world") };
+        s.next_gen += 1; let gen = s.next_gen;
+        s.rooms.insert(code.clone(), Room { code: code.clone(), owner_id: uid, owner_name: name, members: vec![id], running: false, dun: "m1".into(), sim: None, evbuf: vec![], last: Instant::now(), acc: 0.0, gen });
+        s.members.get_mut(&id).unwrap().room = Some(code.clone());
+        self.broadcast(s, &code);
+    }
+
     fn join(&self, s: &mut State, id: u64, code: &str) {
-        let (has_room, has_char, user_id) = { let m = s.members.get(&id).unwrap(); (m.room.is_some(), m.ch.is_some(), m.user_id) };
+        let (has_room, has_char, ip) = { let m = s.members.get(&id).unwrap(); (m.room.is_some(), m.ch.is_some(), m.ip.clone()) };
         if has_room { return; }
         let err = |s: &State, c: &str| { if let Some(m) = s.members.get(&id) { send(m, json!({"t": "err", "code": c})); } };
         if !has_char { return err(s, "need_char"); }
-        if !s.rooms.contains_key(code) {
-            match self.db.owner_of_room(code) {
-                Some((oid, oname)) if Some(oid) == user_id => {
-                    s.next_gen += 1; let gen = s.next_gen;
-                    s.rooms.insert(code.to_string(), Room { code: code.to_string(), owner_id: oid, owner_name: oname, members: vec![], running: false, dun: "m1".into(), sim: None, evbuf: vec![], last: Instant::now(), acc: 0.0, gen });
-                }
-                _ => {
-                    // room-code guessing: a few misses and the socket is closed
-                    if let Some(m) = s.members.get_mut(&id) { m.misses += 1; if m.misses >= 5 { let _ = m.tx.try_send(Out::Close(1008)); } }
-                    return err(s, "not_found");
-                }
-            }
+        let blocked = s.ip_miss.get(&ip).map(|(n, t)| *n >= 20 && t.elapsed().as_secs() < 600).unwrap_or(false);
+        if blocked || !s.rooms.contains_key(code) {
+            if let Some(m) = s.members.get_mut(&id) { m.misses += 1; if m.misses >= 5 { let _ = m.tx.try_send(Out::Close(1008)); } }
+            let e = s.ip_miss.entry(ip).or_insert((0, Instant::now()));
+            if e.1.elapsed().as_secs() >= 600 { *e = (0, Instant::now()); }
+            e.0 += 1;
+            return err(s, "not_found");
         }
         let room = s.rooms.get(code).unwrap();
         if room.running { return err(s, "in_run"); }

@@ -294,15 +294,16 @@ async fn ws_route(State(app): State<Arc<App>>, ConnectInfo(addr): ConnectInfo<So
     let host = headers.get(header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
     let origin_ok = match origin { None => true, Some(o) => app.cors.contains(o) || o == format!("http://{host}") || o == format!("https://{host}") };
     if !origin_ok { return status(403); }
-    if app.limited(format!("ws:{}", app.client_ip(&addr, &headers)), 60, 60_000) { return status(429); }
+    let ip = app.client_ip(&addr, &headers);
+    if app.limited(format!("ws:{ip}"), 60, 60_000) { return status(429); }
     let q: HashMap<String, String> = req.uri().query().map(|q| q.split('&').filter_map(|kv| { let (k, v) = kv.split_once('=')?; Some((percent_decode(&k.replace('+', " "))?, percent_decode(&v.replace('+', " "))?)) }).collect()).unwrap_or_default();
     let who = match app.auth(&headers, q.get("token").map(|s| s.as_str())) {
-        Some(u) => Who { user_id: Some(u.id), name: u.name, cls: String::new(), char_id: q.get("char").and_then(|s| s.parse::<f64>().ok()).map(|f| f as i64).unwrap_or(0) },
+        Some(u) => Who { user_id: Some(u.id), name: u.name, cls: String::new(), char_id: q.get("char").and_then(|s| s.parse::<f64>().ok()).map(|f| f as i64).unwrap_or(0), ip: ip.clone() },
         None => {
             if q.get("token").map(|t| !t.is_empty()).unwrap_or(false) { return status(401); }
             let nick = q.get("nick").map(|s| s.trim().to_string()).unwrap_or_default();
             let cls = q.get("cls").cloned().unwrap_or_default();
-            Who { user_id: None, name: rooms::guest_name(&nick), cls: if data::class(&cls).is_some() { cls } else { "bohatyr".to_string() }, char_id: 0 }
+            Who { user_id: None, name: rooms::guest_name(&nick), cls: if data::class(&cls).is_some() { cls } else { "bohatyr".to_string() }, char_id: 0, ip: ip.clone() }
         }
     };
     let ws = match WebSocketUpgrade::from_request(req, &()).await { Ok(w) => w, Err(_) => return status(400) };

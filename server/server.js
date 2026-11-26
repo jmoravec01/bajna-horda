@@ -188,11 +188,11 @@ server.on('upgrade', (req, socket) => {
     if (limited('ws:' + clientIp(req), 60, 60e3)) { socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n'); return; }
     const u = authUser(req, url);
     let who;
-    if (u) who = { userId: u.id, name: u.name, charId: Number(url.searchParams.get('char')) | 0 };
+    if (u) who = { userId: u.id, name: u.name, charId: Number(url.searchParams.get('char')) | 0, ip: clientIp(req) };
     else {
       if (url.searchParams.get('token')) { socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); return; }
       const nick = (url.searchParams.get('nick') || '').trim(), cls = url.searchParams.get('cls') || '';
-      who = { userId: null, name: validName(nick) ? nick : 'Host', cls: Object.hasOwn(CLASS, cls) ? cls : 'bohatyr' };
+      who = { userId: null, name: validName(nick) ? nick : 'Host', cls: Object.hasOwn(CLASS, cls) ? cls : 'bohatyr', ip: clientIp(req) };
     }
     const conn = upgrade(req, socket, { maxPayload: 512 });
     if (conn) connect(conn, who);

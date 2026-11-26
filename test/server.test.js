@@ -95,10 +95,11 @@ test('co-op: host + guest + friend, run, snapshots, rewards, leaving', async () 
   const h = await reg('Hostik'); await api('POST', 'chars', { name: 'Tank', cls: 'krakonos' }, h.token);
   const f = await reg('Frienda'); await api('POST', 'chars', { name: 'Heal', cls: 'perun' }, f.token);
   const hid = (await api('GET', 'me', null, h.token)).j.profile.chars[0].id, fid = (await api('GET', 'me', null, f.token)).j.profile.chars[0].id;
-  const stranger = await wsc('nick=Nobody&cls=bohatyr'); stranger.send({ t: 'join', code: h.room });
-  assert.equal((await stranger.next((m) => m.t === 'err')).code, 'not_found'); stranger.ws.close();   // the host is not online yet
-  const H = await wsc(`token=${h.token}&char=${hid}`); H.send({ t: 'join', code: h.room });
-  const r1 = await H.next((m) => m.t === 'room'); assert.equal(r1.members.length, 1); assert.equal(r1.hostId, r1.you); assert.equal(r1.unlocked, 1);
+  const stranger = await wsc('nick=Nobody&cls=bohatyr'); stranger.send({ t: 'open' });
+  assert.equal((await stranger.next((m) => m.t === 'err')).code, 'need_account'); stranger.send({ t: 'join', code: 'ABC' });
+  assert.equal((await stranger.next((m) => m.t === 'err')).code, 'not_found'); stranger.ws.close();   // nobody has opened a world yet
+  const H = await wsc(`token=${h.token}&char=${hid}`); H.send({ t: 'open' });
+  const r1 = await H.next((m) => m.t === 'room'); assert.match(r1.code, /^[A-L]{3}$/); h.room = r1.code; assert.equal(r1.members.length, 1); assert.equal(r1.hostId, r1.you); assert.equal(r1.unlocked, 1);
   const F = await wsc(`token=${f.token}&char=${fid}`); F.send({ t: 'join', code: h.room });
   const G = await wsc('nick=Gast&cls=morana'); G.send({ t: 'join', code: h.room.toLowerCase() });
   const r3 = await H.next((m) => m.t === 'room' && m.members.length === 3); assert.deepEqual(r3.members.map((m) => m.cls).sort(), ['krakonos', 'morana', 'perun']);
@@ -119,11 +120,17 @@ test('co-op: host + guest + friend, run, snapshots, rewards, leaving', async () 
   H.ws.close(); F.ws.close();
 });
 
+test('co-op: guessing face combinations closes the socket after 5 misses', async () => {
+  const g = await wsc('nick=Guesser&cls=perun'), closed = new Promise((r) => { g.ws.onclose = r; });
+  for (const code of ['AAA', 'BBB', 'CCC', 'DDD', 'EEE']) g.send({ t: 'join', code });
+  await closed;
+});
+
 test('co-op: one connection per account, malformed websocket frames, flood', async () => {
   const u = await reg('Single1'); await api('POST', 'chars', { name: 'Xx', cls: 'baba' }, u.token);
-  const c1 = await wsc(`token=${u.token}`); c1.send({ t: 'join', code: u.room }); await c1.next((m) => m.t === 'room');
+  const c1 = await wsc(`token=${u.token}`); c1.send({ t: 'open' }); await c1.next((m) => m.t === 'room');
   const closed = new Promise((r) => { c1.ws.onclose = r; });
-  const c2 = await wsc(`token=${u.token}`); c2.send({ t: 'join', code: u.room });
+  const c2 = await wsc(`token=${u.token}`); c2.send({ t: 'open' });
   assert.equal((await c1.next((m) => m.t === 'err')).code, 'busy'); await closed;
   await c2.next((m) => m.t === 'room');
   // raw socket: unmasked frame and an oversized frame must be rejected, the server must survive

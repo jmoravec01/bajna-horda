@@ -7,7 +7,6 @@ import { db, loadProfile, saveProfile, getChar } from './db.js';
 
 const rooms = new Map();          // code -> Room
 const byUser = new Map();         // userId -> Member (one live connection per account)
-const ownerOf = db.prepare('SELECT id, name FROM users WHERE room = ?');
 let nextId = 1;
 
 const send = (m, obj) => m.conn.send(JSON.stringify(obj));
@@ -30,7 +29,7 @@ const broadcast = (room) => { for (const m of room.members.values()) send(m, roo
 const isHost = (room, m) => { const host = [...room.members.values()].find((x) => x.userId === room.ownerId) || [...room.members.values()][0]; return host === m; };
 
 export function connect(conn, who) {
-  const m = { id: nextId++, conn, userId: who.userId || null, name: who.name, cls: who.cls, char: null, room: null, pid: 0, left: false, msgs: 0, tick: Date.now() };
+  const m = { id: nextId++, conn, ip: who.ip, userId: who.userId || null, name: who.name, cls: who.cls, char: null, room: null, pid: 0, left: false, msgs: 0, tick: Date.now() };
   if (m.userId) {                                   // a second connection of the same account replaces the first
     const old = byUser.get(m.userId);
     if (old) { send(old, { t: 'err', code: 'busy' }); old.conn.close(1000); leave(old); }
@@ -51,6 +50,7 @@ function handle(m, text) {
   const room = m.room;
   switch (d.t) {
     case 'ping': send(m, { t: 'pong', n: Number(d.n) || 0 }); break;
+    case 'open': open(m); break;
     case 'join': join(m, String(d.code || '').toUpperCase().slice(0, 8)); break;
     case 'in': if (room?.sim && m.pid && !m.left) room.sim.setInput(m.pid, Number(d.dx), Number(d.dy)); break;
     case 'pick': if (room?.sim && m.pid && !m.left) room.sim.choose(m.pid, Number(d.i) | 0); break;
@@ -66,15 +66,30 @@ function handle(m, text) {
   }
 }
 
+// A world is found by three hero faces: 3 letters A..L, one per class. 12^3 = 1728 combinations,
+// so guessing is throttled per socket (5 misses) and per IP (20 misses / 10 min).
+const ipMiss = new Map();
+function open(m) {
+  if (m.room) return;
+  if (!m.userId) { send(m, { t: 'err', code: 'need_account' }); return; }
+  if (!m.char) { send(m, { t: 'err', code: 'need_char' }); return; }
+  let code = null;
+  for (let i = 0; i < 200 && !code; i++) { const c = Array.from({ length: 3 }, () => String.fromCharCode(65 + randomInt(12))).join(''); if (!rooms.has(c)) code = c; }
+  if (!code) { send(m, { t: 'err', code: 'full_world' }); return; }
+  const room = { code, ownerId: m.userId, ownerName: m.name, members: new Map(), state: 'lobby', dun: 'm1', sim: null, timer: null, evbuf: [], last: 0, acc: 0 };
+  rooms.set(code, room); room.members.set(m.id, m); m.room = room;
+  broadcast(room);
+}
+
 function join(m, code) {
   if (m.room) return;
   if (!m.char) { send(m, { t: 'err', code: 'need_char' }); return; }
-  let room = rooms.get(code);
+  const now = Date.now(), im = ipMiss.get(m.ip), blocked = im && im.n >= 20 && im.reset > now;
+  const room = blocked ? null : rooms.get(code);
   if (!room) {
-    const o = ownerOf.get(code);
-    if (!o || o.id !== m.userId) { send(m, { t: 'err', code: 'not_found' }); return; }
-    room = { code, ownerId: o.id, ownerName: o.name, members: new Map(), state: 'lobby', dun: 'm1', sim: null, timer: null, evbuf: [], last: 0, acc: 0 };
-    rooms.set(code, room);
+    m.misses = (m.misses || 0) + 1; if (m.misses >= 5) m.conn.close(1008);
+    const e = !im || im.reset <= now ? { n: 0, reset: now + 600e3 } : im; e.n++; ipMiss.set(m.ip, e);
+    send(m, { t: 'err', code: 'not_found' }); return;
   }
   if (room.state !== 'lobby') { send(m, { t: 'err', code: 'in_run' }); return; }
   if (room.members.size >= MAX_PLAYERS) { send(m, { t: 'err', code: 'full' }); return; }

@@ -13,6 +13,8 @@ const REC = { s1: 100, s2: 190, s3: 300, m1: 130, m2: 230, m3: 340 };      // re
 const S = { screen: 'title', run: null, net: null, room: null, pick: 'bohatyr', msg: '' };
 
 const activeChar = () => profile.p?.chars.find((c) => c.id === store.d.active) || profile.p?.chars[0] || null;
+// a world is found by three hero faces; the wire code is 3 letters, A..L = the class index
+const faces = (code, scale = 4) => [...code].map((ch) => heroCv(CLASSES[ch.charCodeAt(0) - 65].id, scale)).join('');
 const heroCv = (cls, scale = 3) => `<canvas class="hero" data-hero="${cls}" data-s="${scale}"></canvas>`;
 function fillHeroes() {
   for (const c of $app.querySelectorAll('canvas[data-hero]')) {
@@ -119,13 +121,22 @@ const SCREENS = {
   },
 
   multi() {
-    S.args = []; const c = activeChar();
+    S.args = []; S.combo ||= []; const c = activeChar();
     view(`<div class="screen multi">${topbar('home')}<h2>${t('multi')}</h2>${charCard(c, true)}
-      ${profile.room ? `<button class="btn big" data-act="mine">${t('myroom')} · ${profile.room}</button>` : `<p class="note">${t('guest_mp')}</p>`}
-      <div class="row join"><input id="jcode" maxlength="8" placeholder="${t('code')}" autocapitalize="characters"><button class="btn alt" data-act="join">${t('join')}</button></div><p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
+      ${profile.room ? `<button class="btn big" data-act="mine">${t('myroom')}</button>` : `<p class="note">${t('guest_mp')}</p>`}
+      <h3>${t('join')}</h3><p class="note">${t('faces_pick')}</p>
+      <div class="slots">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}">${S.combo[i] != null ? heroCv(CLASSES[S.combo[i]].id, 4) : '?'}</button>`).join('')}</div>
+      <div class="picker">${CLASSES.map((c, i) => `<button class="face" data-face="${i}">${heroCv(c.id, 3)}</button>`).join('')}</div>
+      <p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
       S.msg = '';
-      if (e.target.closest('[data-act=mine]')) joinRoom(profile.room);
-      if (e.target.closest('[data-act=join]')) { const v = root.querySelector('#jcode').value.trim().toUpperCase(); if (v) joinRoom(v); }
+      if (e.target.closest('[data-act=mine]')) { S.combo = []; joinRoom(''); return; }
+      const f = e.target.closest('[data-face]'), sl = e.target.closest('[data-slot]');
+      if (sl) { S.combo.splice(+sl.dataset.slot); sfx('click'); return SCREENS.multi(); }
+      if (f && S.combo.length < 3) {
+        S.combo.push(+f.dataset.face); sfx('click');
+        if (S.combo.length === 3) { const code = S.combo.map((i) => String.fromCharCode(65 + i)).join(''); S.combo = []; return joinRoom(code); }
+        SCREENS.multi();
+      }
     }));
   },
 
@@ -138,7 +149,7 @@ const SCREENS = {
     const chars = !profile.isGuest && profile.p.chars.length > 1 ? `<select id="chsel">${profile.p.chars.map((x) => `<option value="${x.id}" ${me && x.id === me.charId ? 'selected' : ''}>${esc(x.name)} · ${t('level')} ${x.level}</option>`).join('')}</select>` : '';
     const link = location.origin + location.pathname + '#/room/' + r.code;
     view(`<div class="screen lobby"><div class="top"><button class="icon-btn" data-act="leave">‹</button><span class="who">${t('room_of')} ${esc(r.hostName)}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="snd">${isMuted() ? '×' : '♪'}</button></div>
-      <div class="card"><p class="note">${t('invite')}</p><div class="code">${r.code}</div><button class="btn small" data-act="copy">${t('copy')}</button></div>
+      <div class="card"><p class="note">${t('invite')}</p><div class="faces">${faces(r.code, 5)}</div><button class="btn small" data-act="copy">${t('copy')}</button></div>
       <h3>${t('players')} ${r.members.length}/6</h3><div class="mems">${members}</div>${chars ? `<label class="lab">${t('mychar')}${chars}</label>` : ''}
       <h3>${t('pick_dun')}</h3><div class="duns row3">${duns}</div>
       ${host ? `<button class="btn big" data-act="go">${t('start')}</button>` : `<p class="note">${t('waiting')}</p>`}${profile.isGuest ? `<p class="note">${t('guest_mp')}</p>` : ''}</div>`, (root) => wire(root, (e) => {
@@ -216,7 +227,7 @@ function leaveRoom(quiet) {
 function onNet(m) {
   switch (m.t) {
     case 'room': S.room = m; if (!S.run && S.screen !== 'result') go('lobby'); break;
-    case 'err': { const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char' }[m.code]; S.msg = t(k || 'err_x'); leaveRoom(true); go('multi'); break; }
+    case 'err': { const k = { not_found: 'not_found', in_run: 'in_run', full: 'full_room', busy: 'busy', need_char: 'need_char', need_account: 'need_account', full_world: 'full_world' }[m.code]; S.msg = t(k || 'err_x'); leaveRoom(true); go('multi'); break; }
     case 'start': {
       const c = activeChar();
       S.run = new Run({ root: $app, mode: 'multi', dun: m.dun, players: m.players, meId: m.you, net: S.net, onEnd: () => leaveRoom() });

@@ -79,7 +79,7 @@ export class Net {
     else { url.searchParams.set('nick', opts.nick); url.searchParams.set('cls', opts.cls); }
     if (opts.char) url.searchParams.set('char', opts.char);
     this.ws = new WebSocket(url);
-    this.ws.onopen = () => { this.open = true; this.send({ t: 'join', code: opts.code }); this.ping(); };
+    this.ws.onopen = () => { this.open = true; this.send(opts.code ? { t: 'join', code: opts.code } : { t: 'open' }); this.ping(); };
     this.ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.t === 'pong') { this.rtt = this.rtt * 0.7 + (performance.now() - m.n) * 0.3; return; }
