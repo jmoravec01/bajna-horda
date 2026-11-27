@@ -57,7 +57,7 @@ export class Run {
         <div class="toprow"><span class="lv"></span><span class="tm"></span><span class="bank"></span><button class="icon-btn pbtn" aria-label="${t('pause')}">II</button></div>
         <div class="prog"><i></i>${this.dunData.stages.map((b, n) => `<u class="b${n + 1}" style="left:${b.at / this.dunData.secs * 100}%"></u>`).join('')}</div>
         <div class="hpbar"><i></i><b></b></div><div class="kills"><span>${t('kills')}</span> <b>0</b></div>${this.dunData.shrines ? '<div class="shr"></div>' : ''}<div class="bossbar"><i></i><b>${t('boss')}</b></div>
-        <div class="hint">${this.dunData.shrines ? t('hint_team') : t('hint_move')}</div><div class="toast"></div></div>
+        <div class="hint">${this.dunData.shrines ? t('hint_team') : matchMedia('(pointer: coarse)').matches ? t('hint_move') : t('hint_move_kb')}</div><div class="toast"></div></div>
       <div class="stick"><div class="knob"></div></div>
       <div class="sheet lvlup" hidden></div><div class="sheet pausebox" hidden></div></div>`;
     this.q = (s) => r.querySelector(s);

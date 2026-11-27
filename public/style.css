@@ -122,3 +122,19 @@ button.card .ic { grid-row: span 2; } button.card .ic canvas { width: 44px; heig
 .shr { top: 62px; left: 136px; text-shadow: 2px 2px 0 #000; font-size: 20px; color: #ffd23f; }
 .bossbar.shield i { background: #3a8ac8; } .bossbar.shield b { color: #bfeaff; }
 .stats .loot { justify-content: center; gap: 22px; }
+
+/* menu rework: play button, dungeon facts, help, desktop layout */
+.homegrid, .homecol { display: flex; flex-direction: column; gap: 10px; }
+.btn.playbtn { font-size: 26px; padding: 20px 15px; display: flex; flex-direction: column; align-items: center; gap: 2px; } .btn.playbtn small { font-size: 15px; font-weight: 500; opacity: .75; }
+.dl { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.badge { font-style: normal; font-size: 13px; padding: 1px 7px; color: #fff; background: #3a78b0; } .badge.easy { background: #3c8a3c; } .badge.hard { background: #c07a1a; } .badge.deadly { background: #b02a2a; }
+.dl .armcv { margin: -2px; }
+.help .card p { color: var(--dim); font-size: 15px; margin-top: 4px; line-height: 1.35; }
+.faces-join { background: var(--panel); padding: 8px 10px; } .faces-join summary { cursor: pointer; color: var(--dim); } .faces-join[open] summary { margin-bottom: 6px; }
+#jcode { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 9px 10px; background: #0b0814; color: var(--text); border: 0; }
+@media (min-width: 820px) and (min-height: 560px) {
+  #app:not(:has(.play)) { max-width: 660px; } #app:has(.home) { max-width: 940px; }
+  .screen.home { justify-content: center; } .homegrid { flex-direction: row; align-items: center; gap: 24px; } .homecol { flex: 1; }
+  .homecol:first-child .card { zoom: 1.6; }
+  .duns:not(.row3) { display: grid; grid-template-columns: 1fr 1fr; } .tiles { grid-template-columns: repeat(4, 1fr); } .picker { grid-template-columns: repeat(6, 1fr); }
+}

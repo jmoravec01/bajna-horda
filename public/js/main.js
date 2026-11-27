@@ -1,5 +1,5 @@
 // Screens and navigation.
-import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS, ARMS, ARM, ARM_TYPES, MAX_PLUS } from '../shared/data.js';
+import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS, ARMS, ARM, ARM_TYPES, MAX_PLUS, LEGEND_OF } from '../shared/data.js';
 import { charStats, power, xpNeed, upgradeCost, unlocked, validName, armOf, armDmg, armUpCost, armSell } from '../shared/meta.js';
 import { t, nm, ds, setLang, getLang, detectLang, errText } from './i18n.js';
 import { store, profile, Net, OFFLINE } from './net.js';
@@ -42,8 +42,21 @@ function view(html, bind) {
   bind?.($app);
 }
 const wbar = (v, max) => `<div class="mini"><i data-w="${Math.min(100, Math.round(v / max * 100))}"></i></div>`;
-const go = (name, ...a) => { S.screen = name; sfx('click'); SCREENS[name](...a); };
-const topbar = (back) => `<div class="top">${back ? `<button class="icon-btn" data-go="${back}">‹</button>` : '<span></span>'}<span class="who">${profile.user ? esc(profile.user) : (OFFLINE || !profile.user ? 'Host' : '')}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>`;
+const go = (name, ...a) => { if (name === 'help') { S.from = S.screen; S.fromArgs = [...(S.args || [])]; } S.screen = name; sfx('click'); SCREENS[name](...a); };
+// the controls screen shows itself once, before the very first run (whatever starts it), and any time from the "?" button
+const withHelp = (fn) => { if (store.d.seenHelp) return fn(); store.d.seenHelp = 1; store.save(); S.afterHelp = fn; go('help'); };
+// leaving the result screen while the end chest is still closed loses it: ask first
+const leaveOk = () => !(S.chest && !S.chest.taken && !profile.isGuest) || confirm(t('chest_leave'));
+const lastDun = () => { const d = DUNGEONS.single.find((x) => x.id === store.d.lastDun); return d && unlocked(profile.p, d) ? d : DUNGEONS.single[0]; };
+// a dungeon card: length, bosses, how hard it is for this hero, and the rare weapon its chest can hold
+function dunCard(d, open, pw, lockText) {
+  const m = Math.floor(d.secs / 60), s = String(d.secs % 60).padStart(2, '0'), r = pw / REC[d.id];
+  const lv = r >= 1.15 ? 'easy' : r >= 0.85 ? 'even' : r >= 0.6 ? 'hard' : 'deadly', lg = ARM[LEGEND_OF[d.id]];
+  return `<button class="dun ${open ? '' : 'lock'} ${d.raid ? 'raid' : ''}" data-d="${d.id}" ${open ? '' : 'disabled'}><b>${esc(nm(d))}${d.raid ? ` · ${t('raid')}` : ''}</b>${open
+    ? `<small>⏱ ${m}:${s} · ☠ ${d.stages.length} ${t('bosses')} · ${t('recommended')}: ${REC[d.id]}</small><span class="dl"><i class="badge ${lv}">${t('diff_' + lv)}</i>${lg ? `${armCv(lg.id, 0, 2)}<small>${esc(nm(lg))}</small>` : ''}</span>`
+    : `<small>${lockText}</small>`}<span class="bg bg-${d.deco}"></span></button>`;
+}
+const topbar = (back) => `<div class="top">${back ? `<button class="icon-btn" data-go="${back}">‹</button>` : '<span></span>'}<span class="who">${profile.user ? esc(profile.user) : (OFFLINE || !profile.user ? 'Host' : '')}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-go="help">?</button><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>`;
 function wire(root, extra) {
   root.onclick = (e) => {
     const g = e.target.closest('[data-go]'); if (g) return go(g.dataset.go);
@@ -85,15 +98,29 @@ const SCREENS = {
 
   home() {
     music('menu'); S.args = [];
-    const c = activeChar();
+    const c = activeChar(), ld = lastDun();
     const card = c ? charCard(c, true).replace('class="card char"', 'class="card char tap" data-go="chars" role="button"') : `<div class="card empty">${t('no_char')}</div>`;   // tap the hero card: character details
-    view(`<div class="screen home">${topbar()}${card}
-      <button class="btn big" data-go="single" ${c ? '' : 'disabled'}>${t('single')}</button>
-      <button class="btn big alt" data-go="multi" ${c && !OFFLINE ? '' : 'disabled'}>${t('multi')}</button>
-      <button class="btn big ghost" data-go="chars">${t('chars')} (${profile.p.chars.length}/${MAX_CHARS})</button>
-      <button class="btn ghost" data-go="inv" ${c ? '' : 'disabled'}>${t('inventory')}${(profile.p.bag || []).length ? ` · ${profile.p.bag.length}` : ''}</button>
-      <button class="btn ghost small" data-act="logout">${t('logout')}</button></div>`, (root) => wire(root, async (e) => {
+    view(`<div class="screen home">${topbar()}<div class="homegrid"><div class="homecol">${card}</div><div class="homecol">
+      <button class="btn big playbtn" data-act="play" ${c ? '' : 'disabled'}>▶ ${t('play')}<small>${esc(nm(ld))}</small></button>
+      <div class="row"><button class="btn alt" data-go="single" ${c ? '' : 'disabled'}>${t('single')}</button><button class="btn alt" data-go="multi" ${c && !OFFLINE ? '' : 'disabled'}>${t('multi')}</button></div>
+      <div class="row"><button class="btn ghost" data-go="chars">${t('chars')} (${profile.p.chars.length}/${MAX_CHARS})</button><button class="btn ghost" data-go="inv" ${c ? '' : 'disabled'}>${t('inventory')}${(profile.p.bag || []).length ? ` · ${profile.p.bag.length}` : ''}</button></div>
+      <button class="btn ghost small" data-act="logout">${t('logout')}</button></div></div></div>`, (root) => wire(root, async (e) => {
+      if (e.target.closest('[data-act=play]')) return withHelp(() => startSingle(ld.id));
       if (e.target.closest('[data-act=logout]')) { await profile.logout(); go('title'); }
+    }));
+  },
+
+  help() {
+    S.args = [];
+    view(`<div class="screen help"><div class="top"><button class="icon-btn" data-act="helpok">‹</button><span class="who"></span><button class="icon-btn" data-act="lang">${t('lang')}</button><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>
+      <h2>${t('help_title')}</h2>
+      <div class="card"><h3>${t('help_touch')}</h3><p>${t('help_touch_d')}</p></div><div class="card"><h3>${t('help_kb')}</h3><p>${t('help_kb_d')}</p></div>
+      <div class="card"><h3>${t('help_goal')}</h3><p>${t('help_goal_d')}</p></div><div class="card"><h3>${t('help_team')}</h3><p>${t('help_team_d')}</p></div>
+      <button class="btn big" data-act="helpok">${S.afterHelp ? t('help_go') : t('back')}</button></div>`, (root) => wire(root, (e) => {
+      if (!e.target.closest('[data-act=helpok]')) return;
+      const f = S.afterHelp; S.afterHelp = null;
+      S.screen = S.from && S.from !== 'help' ? S.from : 'home';      // the run that follows has no screen of its own
+      if (f) f(); else go(S.from && S.from !== 'help' ? S.from : 'home', ...(S.fromArgs || []));
     }));
   },
 
@@ -151,12 +178,9 @@ const SCREENS = {
 
   single() {
     S.args = []; const c = activeChar(), pw = power(c);
-    const cards = DUNGEONS.single.map((d, i) => {
-      const open = unlocked(profile.p, d);
-      return `<button class="dun ${open ? '' : 'lock'}" data-d="${d.id}" ${open ? '' : 'disabled'}><b>${esc(nm(d))}</b><small>${open ? `${t('recommended')}: ${REC[d.id]}` : t('locked')}</small><span class="bg bg-${d.deco}"></span></button>`;
-    }).join('');
+    const cards = DUNGEONS.single.map((d) => dunCard(d, unlocked(profile.p, d), pw, t('locked'))).join('');
     view(`<div class="screen single">${topbar('home')}<h2>${t('single')}: ${t('dungeons')}</h2>${charCard(c, true)}<div class="duns">${cards}</div><p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
-      const d = e.target.closest('[data-d]'); if (d) { S.msg = ''; startSingle(d.dataset.d); }
+      const d = e.target.closest('[data-d]'); if (d) { S.msg = ''; withHelp(() => startSingle(d.dataset.d)); }
     }));
   },
 
@@ -164,17 +188,23 @@ const SCREENS = {
     S.args = []; S.combo ||= []; const c = activeChar();
     view(`<div class="screen multi">${topbar('home')}<h2>${t('multi')}</h2>${charCard(c, true)}
       <button class="btn big ${profile.room ? '' : 'locked'}" data-act="mine" ${profile.room ? '' : 'aria-disabled="true"'}>${t('mp_create')}</button>${profile.room ? '' : `<p class="note">${t('guest_mp')}</p>`}
-      <h3>${t('join')}</h3><p class="note">${t('faces_pick')}</p>
-      <div class="slots">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}">${S.combo[i] != null ? heroCv(CLASSES[S.combo[i]].id, 4) : '?'}</button>`).join('')}</div>
-      <div class="picker">${CLASSES.map((c, i) => `<button class="face" data-face="${i}">${heroCv(c.id, 3)}</button>`).join('')}</div>
+      <h3>${t('join')}</h3><div class="row"><input id="jcode" placeholder="${t('join_ph')}" autocomplete="off" autocapitalize="off"><button class="btn small" data-act="joinlink">${t('join_go')}</button></div>
+      <details class="faces-join" ${S.combo.length ? 'open' : ''}><summary>${t('join_faces')}</summary><p class="note">${t('faces_pick')}</p>
+        <div class="slots">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}">${S.combo[i] != null ? heroCv(CLASSES[S.combo[i]].id, 4) : '?'}</button>`).join('')}</div>
+        <div class="picker">${CLASSES.map((c, i) => `<button class="face" data-face="${i}">${heroCv(c.id, 3)}</button>`).join('')}</div></details>
       <p class="msg">${esc(S.msg)}</p></div>`, (root) => wire(root, (e) => {
       S.msg = '';
       if (e.target.closest('[data-act=mine]')) { if (!profile.room) return popup(t('need_login'), t('need_login_d')); S.combo = []; return go('mpcreate'); }
+      if (e.target.closest('[data-act=joinlink]')) {       // a pasted invite link (…#/room/CODE) or the bare code
+        const v = root.querySelector('#jcode').value.trim(), m = v.match(/#\/room\/([A-Za-z0-9]+)/) || v.match(/^([A-Za-z0-9]{3,12})$/);
+        if (!m) return note(t('join_bad'));
+        return withHelp(() => joinRoom(m[1].toUpperCase()));
+      }
       const f = e.target.closest('[data-face]'), sl = e.target.closest('[data-slot]');
       if (sl) { S.combo.splice(+sl.dataset.slot); sfx('click'); return SCREENS.multi(); }
       if (f && S.combo.length < 3) {
         S.combo.push(+f.dataset.face); sfx('click');
-        if (S.combo.length === 3) { const code = S.combo.map((i) => String.fromCharCode(65 + i)).join(''); S.combo = []; return joinRoom(code); }
+        if (S.combo.length === 3) { const code = S.combo.map((i) => String.fromCharCode(65 + i)).join(''); S.combo = []; return withHelp(() => joinRoom(code)); }
         SCREENS.multi();
       }
     }));
@@ -182,11 +212,10 @@ const SCREENS = {
 
   mpcreate() {
     S.args = []; const c = activeChar(), pr = profile.p.progress.multi;
-    const cards = DUNGEONS.multi.map((d, i) => { const open = i < pr;
-      return `<button class="dun ${open ? '' : 'lock'} ${d.raid ? 'raid' : ''}" data-d="${d.id}" ${open ? '' : 'disabled'}><b>${esc(nm(d))}${d.raid ? ` · ${t('raid')}` : ''}</b><small>${open ? `${t('recommended')}: ${REC[d.id]}` : d.raid ? t('raid_lock') : t('locked')}</small><span class="bg bg-${d.deco}"></span></button>`; }).join('');
+    const pw = power(c), cards = DUNGEONS.multi.map((d, i) => dunCard(d, i < pr, pw, d.raid ? t('raid_lock') : t('locked'))).join('');
     view(`<div class="screen multi">${topbar('multi')}<h2>${t('mp_create')}</h2>${charCard(c, true)}<p class="note">${t('team_rules')}</p><p class="note">${t('raid_rules')}</p>
       <h3>${t('mp_pick')}</h3><div class="duns">${cards}</div><p class="note">${t('mp_pick_d')}</p></div>`, (root) => wire(root, (e) => {
-      const d = e.target.closest('[data-d]'); if (d) { joinRoom(''); S.wantDun = d.dataset.d; }
+      const d = e.target.closest('[data-d]'); if (d) withHelp(() => { joinRoom(''); S.wantDun = d.dataset.d; });
     }));
   },
 
@@ -232,21 +261,22 @@ const SCREENS = {
       const d = e.target.closest('[data-d]'); if (d) { S.net.send({ t: 'dun', dun: d.dataset.d }); sfx('click'); }
       if (e.target.closest('[data-act=go]')) S.net.send({ t: 'start' });
       if (e.target.closest('[data-act=leave]')) leaveRoom();
-      if (e.target.closest('[data-act=copy]')) { navigator.clipboard?.writeText(link).catch(() => {}); e.target.closest('button').textContent = t('copied'); }
+      if (e.target.closest('[data-act=copy]')) { if (navigator.share && matchMedia('(pointer: coarse)').matches) navigator.share({ url: link }).catch(() => {}); else navigator.clipboard?.writeText(link).catch(() => {}); e.target.closest('button').textContent = t('copied'); }
     }));
     const sel = $app.querySelector('#chsel'); if (sel) sel.onchange = () => { store.d.active = +sel.value; store.save(); S.net.send({ t: 'char', id: +sel.value }); };
   },
 
   result(res) {
     S.args = [res];
-    const rw = res.reward || {};
+    const rw = res.reward || {}, di = DUNGEONS.single.findIndex((d) => d.id === res.dun), nx = res.cleared && di >= 0 ? DUNGEONS.single[di + 1] : null, nxt = nx && unlocked(profile.p, nx) ? nx : null;   // 'next dungeon' only once it is open
     view(`<div class="screen result"><h1 class="${res.cleared ? 'win' : 'lose'}">${res.cleared ? t('win') : t('lose')}</h1>
       <div class="card stats"><div><span>${t('time')}</span><b>${Math.floor(res.time / 60)}:${String(Math.floor(res.time % 60)).padStart(2, '0')}</b></div><div><span>${t('kills')}</span><b>${res.kills ?? 0}</b></div>
       <div><span>${t('coins')}</span><b>+${rw.coins ?? 0} ◆</b></div><div><span>${t('xp')}</span><b>+${rw.xp ?? 0}</b></div>
       ${res.drops?.length ? `<div class="loot"><span>${t('boss_drops')}</span>${res.drops.map((id) => wTile(id)).join('')}</div>` : ''}${res.carry > 1.05 ? `<div><span>${t('carry')}</span><b>×${res.carry.toFixed(1)}</b></div>` : ''}${res.levelUp > 0 ? `<div class="up"><span>${t('lvlup')}</span><b>${res.level}</b></div>` : ''}</div>
-      ${res.chest ? chestBox() : ''}<button class="btn big" data-act="back">${t('back')}</button></div>`, (root) => wire(root, (e) => {
+      ${res.chest ? chestBox() : ''}${res.multi ? `<button class="btn big" data-act="back">${t('back')}</button>` : `<button class="btn big" data-act="again">${t('again')}</button>${nxt ? `<button class="btn alt" data-act="next">${t('next_dun')}: ${esc(nm(nxt))}</button>` : ''}<button class="btn ghost" data-act="back">${t('menu')}</button>`}</div>`, (root) => wire(root, (e) => {
+      if (e.target.closest('[data-act=again]') || e.target.closest('[data-act=next]')) { if (leaveOk()) startSingle(e.target.closest('[data-act=next]') ? nxt.id : res.dun); return; }
       if (e.target.closest('[data-act=loot]')) { S.net?.send({ t: 'loot' }); e.target.closest('button').disabled = true; return; }
-      if (!e.target.closest('[data-act=back]')) return;
+      if (!e.target.closest('[data-act=back]') || !leaveOk()) return;
       if (!res.multi) { const n = S.net; S.net = null; n?.close(); }      // a single run kept its connection only for the chest
       if (res.multi && S.net?.open) { S.room ? go('lobby') : go('home'); } else go(res.multi ? 'multi' : 'home');
     }));
@@ -273,18 +303,18 @@ async function afterLogin() {
   const hash = location.hash.match(/^#\/room\/([A-Za-z0-9]+)/);
   if (!profile.p.chars.length) { go('create'); return; }
   if (!activeChar()) store.d.active = profile.p.chars[0].id;
-  if (hash && !OFFLINE) return joinRoom(hash[1].toUpperCase());
+  if (hash && !OFFLINE) return withHelp(() => joinRoom(hash[1].toUpperCase()));
   go('home');
 }
 
 async function startSingle(dunId) {
-  const c = activeChar();
+  const c = activeChar(); S.curDun = dunId; store.d.lastDun = dunId; store.save();
   if (!profile.isGuest && !OFFLINE) return startSolo(dunId);
   // guest / offline: the run is simulated here and the result stays in this browser
   S.run = new Run({ root: $app, mode: 'single', dun: dunId, players: [{ id: 1, name: c.name, cls: c.cls, arm: armOf(c)[0].id, plus: armOf(c)[1] }], meId: 1, char: { ...c }, onEnd: (over, st) => {
     S.run = null;
     const j = profile.runFinishLocal(c.id, { dungeonId: dunId, kills: st.kills, coinsPicked: st.coinsPicked, timeSec: st.timeSec, cleared: st.cleared });
-    go('result', { cleared: st.cleared, time: st.timeSec, kills: st.kills, reward: j.reward, levelUp: j.levelUp, level: activeChar().level });
+    go('result', { dun: dunId, cleared: st.cleared, time: st.timeSec, kills: st.kills, reward: j.reward, levelUp: j.levelUp, level: activeChar().level });
   } });
   S.run.start();
 }
@@ -341,7 +371,7 @@ function onNet(m) {
       const run = S.run; S.run = null; run?.destroy();
       const solo = S.solo; S.chest = m.chest ? { items: m.chest.items, taken: null } : null;
       if (solo) { S.solo = false; if (!S.chest) { const n = S.net; S.net = null; n?.close(); } }      // a chest keeps the connection until it is opened
-      profile.load().catch(() => {}).finally(() => go('result', { multi: !solo, cleared: m.over.cleared, time: m.over.time, kills: m.kills, reward: m.reward, levelUp: m.levelUp || 0, level: m.level, carry: m.carry, drops: m.drops, chest: !!m.chest }));
+      profile.load().catch(() => {}).finally(() => go('result', { multi: !solo, dun: solo ? S.curDun : null, cleared: m.over.cleared, time: m.over.time, kills: m.kills, reward: m.reward, levelUp: m.levelUp || 0, level: m.level, carry: m.carry, drops: m.drops, chest: !!m.chest }));
       break;
     }
   }
