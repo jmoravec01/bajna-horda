@@ -63,7 +63,7 @@ export class Run {
     this.q = (s) => r.querySelector(s);
     this.cv = this.q('.cv'); this.ctx = this.cv.getContext('2d');
     this.bind(); this.resize();
-    music('battle');
+    music(this.dunData.id);
     if (this.mode === 'single') {
       this.sim = new Sim({ seed: (Math.random() * 2 ** 31) | 0, dungeonId: this.dun, players: [this.char] });
       this.push(this.sim.snapshot(1));

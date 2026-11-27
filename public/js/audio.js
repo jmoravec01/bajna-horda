@@ -1,5 +1,6 @@
+import { SCORES, compile, freq } from './score.js';
 // Tiny Web Audio synth: sound effects and a looping chiptune. Unlocks on every gesture until the context runs (iOS needs that).
-let ctx = null, master = null, musicGain = null, muted = false, want = null, timer = null, step = 0;
+let ctx = null, master = null, musicGain = null, muted = false, want = null, timer = null;
 const last = {};
 
 function ensure() {
@@ -8,6 +9,7 @@ function ensure() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   ctx = new AC();
+  ctx.onstatechange = () => { if (ctx.state === 'running' && want && !song) startMusic(); };   // the first tap resumes the context: start the music then
   master = ctx.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(ctx.destination);
   musicGain = ctx.createGain(); musicGain.gain.value = 0.16; musicGain.connect(master);
   return ctx;
@@ -57,20 +59,33 @@ export function sfx(name) {
   last[name] = now; SFX[name]?.();
 }
 
-// two-voice loop: bass + lead, a little different per track
-const TRACKS = {
-  menu: { bpm: 96, bass: [110, 0, 110, 0, 131, 0, 98, 0], lead: [440, 0, 523, 0, 494, 0, 392, 0, 440, 0, 523, 659, 587, 0, 494, 0] },
-  battle: { bpm: 132, bass: [98, 98, 0, 98, 117, 0, 110, 110], lead: [392, 0, 466, 392, 0, 523, 466, 0, 392, 0, 349, 0, 392, 466, 523, 0] },
-};
-function tick() {
-  const t = TRACKS[want]; if (!t || !ctx || ctx.state !== 'running') return;
-  const b = t.bass[step % t.bass.length], l = t.lead[step % t.lead.length];
-  if (b) { tone(b, 0.22, 'triangle', 0.5, 0, 0, musicGain); tone(b * 2, 0.12, 'square', 0.12, 0, 0, musicGain); }
-  if (l) tone(l, 0.16, 'square', 0.3, 0, 0, musicGain);
-  step++;
+// music: each place plays its own score (score.js), scheduled a little ahead on the audio clock so the timing does not drift
+let song = null, pos = 0, nextT = 0;
+function note(f, dur, type, vol, delay, sus, det) {
+  const c = ctx, t = c.currentTime + delay, g = c.createGain(), n = det ? 2 : 1;
+  g.connect(musicGain);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol / (det ? 1.4 : 1), t + 0.008);
+  if (sus) g.gain.setValueAtTime(vol, t + dur * 0.8);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  for (let i = 0; i < n; i++) { const o = c.createOscillator(); o.type = type; o.frequency.value = f; if (det) o.detune.value = i ? det : -det; o.connect(g); o.start(t); o.stop(t + dur + 0.03); }
 }
-function startMusic() { clearInterval(timer); step = 0; const t = TRACKS[want]; if (t) timer = setInterval(tick, 60000 / t.bpm / 2); }
-export function music(name) { if (name === want) return; want = name; clearInterval(timer); if (ctx && ctx.state === 'running' && name) startMusic(); }
+function drum(ch, d) {
+  if (ch === 'k') tone(150, 0.14, 'sine', 0.6, -110, d, musicGain);
+  else if (ch === 's') { noise(0.1, 0.25, 1500, musicGain, d); tone(190, 0.08, 'triangle', 0.2, -60, d, musicGain); }
+  else if (ch === 'h') noise(0.03, 0.1, 7000, musicGain, d);
+}
+function pump() {
+  if (!song || !ctx || ctx.state !== 'running') return;
+  if (nextT < ctx.currentTime) nextT = ctx.currentTime + 0.05;       // the tab slept: skip ahead instead of rushing
+  while (nextT < ctx.currentTime + 0.3) {
+    const d = nextT - ctx.currentTime;
+    for (const v of song.voices) for (const [m, l] of v.ev.get(pos) || []) note(freq(m), l * song.step, v.w, v.vol, d, v.sus, v.det);
+    if (song.drums) drum(song.drums[pos % song.drums.length], d);
+    pos = (pos + 1) % song.len; nextT += song.step;
+  }
+}
+function startMusic() { clearInterval(timer); song = compile(SCORES[want] || SCORES.menu); pos = 0; nextT = ctx.currentTime + 0.08; pump(); timer = setInterval(pump, 80); }
+export function music(name) { if (name === want) return; want = name; clearInterval(timer); song = null; if (ctx && ctx.state === 'running' && name) startMusic(); }
 export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; }
 export const isMuted = () => muted;
 
