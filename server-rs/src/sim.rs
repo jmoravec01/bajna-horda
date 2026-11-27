@@ -1166,6 +1166,26 @@ mod tests {
         assert!(wins >= 2, "wins {wins}");
     }
 
+    /// cargo test --release cost -- --ignored --nocapture : server CPU per second of play
+    #[test]
+    #[ignore]
+    fn cost() {
+        for (dun, lvls) in [("s1", vec![1u32]), ("s3", vec![18]), ("m3", vec![25, 25, 25, 25]), ("r1", vec![40, 40, 40, 40])] {
+            let players = lvls.iter().enumerate().map(|(i, &l)| input(&data().classes[i * 3 % 12].id, l)).collect();
+            let mut sim = Sim::new(7, dun, players);
+            let (mut st, mut sn, mut bytes, mut steps, mut snaps, mut maxe) = (0f64, 0f64, 0usize, 0u32, 0u32, 0usize);
+            while sim.over.is_none() && (sim.tick as f64) * data().consts.dt < 300.0 {
+                for pi in 0..sim.players.len() { bot_step(&mut sim, pi); }
+                for pi in 0..sim.players.len() { sim.players[pi].hp = sim.players[pi].max_hp; }   // keep alive: measure a full 5 min
+                let t = std::time::Instant::now(); sim.step(); st += t.elapsed().as_secs_f64(); steps += 1;
+                maxe = maxe.max(sim.enemies.len());
+                if sim.tick % 2 == 0 { for pid in 1..=sim.players.len() as u32 { let t = std::time::Instant::now(); let v = sim.snapshot(pid, None); let j = v.to_string(); sn += t.elapsed().as_secs_f64(); bytes += j.len(); snaps += 1; } }
+            }
+            let secs = steps as f64 * data().consts.dt;
+            println!("{dun} {}p: step {:.0} us, snapshot {:.0} us, CPU {:.1} % of one core, {:.1} kB/s per player, max enemies {maxe}", lvls.len(), st / steps as f64 * 1e6, sn / snaps as f64 * 1e6, (st + sn) / secs * 100.0, bytes as f64 / secs / 1000.0 / lvls.len() as f64);
+        }
+    }
+
     /// cargo test --release balance -- --ignored --nocapture  (same matrix as tools/balance.js)
     #[test]
     #[ignore]
