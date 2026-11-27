@@ -124,6 +124,7 @@ pub struct Dungeon {
     pub shrines: usize,
     pub pace: f64,
     pub spawn: f64,
+    pub hit: f64,
     pub raid: bool,
     pub stages: String,
     pub roster: Vec<RosterEntry>,

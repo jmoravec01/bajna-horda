@@ -368,6 +368,7 @@
    "shrines": 0,
    "pace": 1.1,
    "spawn": 1.25,
+   "hit": 1.5,
    "raid": false,
    "stages": "single",
    "roster": [
@@ -413,6 +414,7 @@
    "shrines": 0,
    "pace": 1.1,
    "spawn": 1.25,
+   "hit": 1.5,
    "raid": false,
    "stages": "single",
    "roster": [
@@ -458,6 +460,7 @@
    "shrines": 0,
    "pace": 1.1,
    "spawn": 1.25,
+   "hit": 1.5,
    "raid": false,
    "stages": "single",
    "roster": [
@@ -503,6 +506,7 @@
    "shrines": 3,
    "pace": 0.9,
    "spawn": 1.2,
+   "hit": 1.5,
    "raid": false,
    "stages": "team",
    "roster": [
@@ -548,6 +552,7 @@
    "shrines": 3,
    "pace": 0.9,
    "spawn": 1.2,
+   "hit": 1.5,
    "raid": false,
    "stages": "team",
    "roster": [
@@ -593,6 +598,7 @@
    "shrines": 3,
    "pace": 0.9,
    "spawn": 1.2,
+   "hit": 1.5,
    "raid": false,
    "stages": "team",
    "roster": [
@@ -638,6 +644,7 @@
    "shrines": 4,
    "pace": 1,
    "spawn": 1.45,
+   "hit": 2,
    "raid": true,
    "stages": "team",
    "roster": [

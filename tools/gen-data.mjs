@@ -7,7 +7,7 @@ const out = {
   weapons: D.WEAPONS.map(({ d_cs, d_en, cs, en, ...w }) => w),
   passives: D.PASSIVES.map((p) => p.id),
   arch: D.ARCH,
-  dungeons: [...D.DUNGEONS.single, ...D.DUNGEONS.multi].map((d) => ({ id: d.id, mode: d.mode, diff: d.diff, xp: d.xp, secs: d.secs, shrines: d.shrines, pace: d.pace, spawn: d.spawn, raid: !!d.raid, stages: d.stages === D.BOSS_STAGES ? 'single' : 'team',
+  dungeons: [...D.DUNGEONS.single, ...D.DUNGEONS.multi].map((d) => ({ id: d.id, mode: d.mode, diff: d.diff, xp: d.xp, secs: d.secs, shrines: d.shrines, pace: d.pace, spawn: d.spawn, hit: d.hit, raid: !!d.raid, stages: d.stages === D.BOSS_STAGES ? 'single' : 'team',
     roster: d.roster.map(([arch, , at, weight]) => ({ arch, at, weight })), elite: d.elite[0], boss: { arch: d.boss.arch, hp: d.boss.hp, scale: d.boss.scale ?? 2.6 } })),
   boss_stages: { single: D.BOSS_STAGES, team: D.TEAM_STAGES },
   legend_of: D.LEGEND_OF,

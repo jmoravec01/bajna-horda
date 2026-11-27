@@ -500,7 +500,7 @@ impl Sim {
         let id = self.nid; self.nid += 1;
         let spd = arch.spd * if boss { 0.8 } else { 1.0 } * (1.0 + self.rnd.next() * 0.12);
         let mut e = Enemy { id, typ: idx, beh: arch.beh.clone(), x: tx + a.cos() * dist, y: ty + a.sin() * dist, hp, max_hp: hp,
-            dmg: arch.dmg * if boss { 1.3 * bst.map_or(1.0, |b| b.dmg) } else { 1.0 } * ts_dmg * self.d_mul * d.diff.sqrt(), spd, r: arch.r * scale, xp: arch.xp * if elite { 6.0 } else { 1.0 },
+            dmg: arch.dmg * if boss { 1.3 * bst.map_or(1.0, |b| b.dmg) } else { 1.0 } * ts_dmg * self.d_mul * d.diff.sqrt() * d.hit, spd, r: arch.r * scale, xp: arch.xp * if elite { 6.0 } else { 1.0 },
             t: self.rnd.next() * 3.0, boss, elite, big: arch.r * scale >= 8.0, arch_spd: arch.spd, ..Default::default() };
         if boss { e.beh = "boss".to_string(); e.bt = 3.0; e.bs = bst.map_or(8.0, |b| b.every); e.xp = 0.0; e.stage = idx - 6; }
         self.enemies.push(e);

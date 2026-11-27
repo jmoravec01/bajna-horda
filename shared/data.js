@@ -99,7 +99,7 @@ export const ARCH = {
 // ---- dungeons ----
 // roster: [arch, palette[main, dark, accent], appears-at-seconds, weight]; the last two entries are the elite and the boss
 // team dungeons (mode 'multi') get 10-minute runs, shrines to hold and a pace of their own; single ones keep the 5-minute defaults
-const dun = (o) => (o.mode === 'multi' ? { secs: TEAM_SECONDS, stages: TEAM_STAGES, shrines: 3, pace: 0.9, spawn: 1.2, ...o } : { secs: RUN_SECONDS, stages: BOSS_STAGES, shrines: 0, pace: PACE, spawn: 1.25, ...o });
+const dun = (o) => (o.mode === 'multi' ? { secs: TEAM_SECONDS, stages: TEAM_STAGES, shrines: 3, pace: 0.9, spawn: 1.2, hit: 1.5, ...o } : { secs: RUN_SECONDS, stages: BOSS_STAGES, shrines: 0, pace: PACE, spawn: 1.25, hit: 1.5, ...o });
 export const DUNGEONS = {
   single: [
     dun({ id: 's1', mode: 'single', cs: 'Louka', en: 'Meadow', diff: 1.3, xp: 1, bg: ['#3d7a3a', '#356d33', '#4f8f45', '#2d5e2b'], deco: 'grass',
@@ -123,7 +123,7 @@ export const DUNGEONS = {
       roster: [['imp', ['#6ac8f0', '#1a5a8a', '#fff'], 0, 6], ['wolf', ['#e8f0f8', '#8aa0b0', '#38f'], 25, 4], ['ghost', ['#d0e8ff', '#7a9ac0', '#fff'], 80, 3], ['boar', ['#b8d0e0', '#5a7a90', '#fff'], 150, 2.5], ['ogre', ['#9ac0d8', '#3a5a78', '#fff'], 240, 1.5]],
       elite: ['ogre', ['#6aa0d8', '#1a3a6a', '#ff0']], boss: { arch: 'ogre', pal: ['#ffffff', '#5a8ab0', '#38f'], names: ['Emil', 'Jiří', 'Pavel'], designs: ['hranostaj', 'vlk', 'mamut'], hp: 5200, scale: 2.8 } }),
     // the raid: shaped like a multiplayer dungeon, several times harder (stronger enemies, faster waves, four shrines); open once Glacier is cleared
-    dun({ id: 'r1', mode: 'multi', raid: true, cs: 'Navia', en: 'Navia', diff: 3.2, xp: 4, spawn: 1.45, pace: 1.0, shrines: 4, bg: ['#2a1f3a', '#241a32', '#34274a', '#1a1226'], deco: 'bones',
+    dun({ id: 'r1', mode: 'multi', raid: true, cs: 'Navia', en: 'Navia', diff: 3.2, xp: 4, spawn: 1.45, hit: 2, pace: 1.0, shrines: 4, bg: ['#2a1f3a', '#241a32', '#34274a', '#1a1226'], deco: 'bones',
       roster: [['ghost', ['#c8a8ff', '#5a3a8a', '#fff'], 0, 5], ['imp', ['#9a3ad8', '#3a0a5a', '#ff0'], 0, 4], ['wolf', ['#3a2a4a', '#0e0816', '#f3f'], 40, 3], ['spider', ['#5a2a6a', '#1a0a22', '#f6f'], 90, 3], ['boar', ['#4a2a5a', '#160a1e', '#fff'], 150, 2.5], ['ogre', ['#6a3a8a', '#1e0a2e', '#fd0'], 220, 1.5]],
       elite: ['ogre', ['#8a3ac8', '#2a0a44', '#ff0']], boss: { arch: 'ogre', pal: ['#b020f0', '#2a0640', '#ff3'], names: ['Martin', 'Tomáš', 'Jakub'], designs: ['kocour', 'sova', 'drak'], hp: 9000, scale: 3.4 } }),
   ],
