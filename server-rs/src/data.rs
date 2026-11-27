@@ -48,6 +48,7 @@ pub struct Arm {
 pub struct Class {
     pub id: String,
     pub weapon: String,
+    pub arm: String,
     pub hp: f64,
     pub spd: f64,
     pub dmg: f64,
@@ -141,7 +142,6 @@ pub struct Data {
     pub arch: HashMap<String, Arch>,
     pub dungeons: Vec<Dungeon>,
     pub slots: Vec<String>,
-    pub starter: String,
     pub boss_stages: HashMap<String, Vec<BossStage>>,
     pub legend_of: HashMap<String, String>,
     pub arms: Vec<Arm>,
@@ -155,6 +155,8 @@ pub fn data() -> &'static Data {
 pub fn class(id: &str) -> Option<&'static Class> {
     data().classes.iter().find(|c| c.id == id)
 }
+/// The free tier-1 weapon every character of this class starts with.
+pub fn starter_of(cls: &str) -> String { format!("{}1", class(cls).map_or("staff", |c| c.arm.as_str())) }
 pub fn arm(id: &str) -> Option<&'static Arm> {
     data().arms.iter().find(|a| a.id == id)
 }

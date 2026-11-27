@@ -1,7 +1,7 @@
 // Meta progression: character stats, levels, equipment, run rewards. Pure functions shared by the server and the offline (guest) store.
-import { CLASS, DUNGEON, DUNGEONS, MAX_CHARS, MAX_LEVEL, MAX_EQUIP, SLOTS, ARM, STARTER, MAX_PLUS } from './data.js';
+import { CLASS, DUNGEON, DUNGEONS, MAX_CHARS, MAX_LEVEL, MAX_EQUIP, SLOTS, ARM, starterOf, MAX_PLUS } from './data.js';
 
-export const newChar = (id, name, cls) => ({ id, name, cls, level: 1, xp: 0, equip: { armor: 1, ring: 1, boots: 1 }, arms: { [STARTER]: 0 }, held: STARTER });
+export const newChar = (id, name, cls) => ({ id, name, cls, level: 1, xp: 0, equip: { armor: 1, ring: 1, boots: 1 }, arms: { [starterOf(cls)]: 0 }, held: starterOf(cls) });
 export const newProfile = () => ({ coins: 0, chars: [], progress: { single: 1, multi: 1 } });
 
 export const validName = (s) => typeof s === 'string' && /^[\p{L}\p{N} _.-]{2,16}$/u.test(s.trim());
@@ -12,12 +12,16 @@ export const upgradeCost = (lvl) => Math.round(25 * Math.pow(lvl, 1.4));
 const armById = (id) => (typeof id === 'string' && Object.hasOwn(ARM, id) ? ARM[id] : null);   // own keys only: no '__proto__' lookups
 // legacy characters (a numeric equip.weapon level, no arms yet) get the starter weapon at +(level-1)
 export function fixArms(c) {
-  if (!c.arms || typeof c.arms !== 'object') c.arms = { [STARTER]: Math.min(MAX_PLUS, Math.max(0, (c.equip?.weapon || 1) - 1)) };
+  const st = starterOf(c.cls);
+  if (!c.arms || typeof c.arms !== 'object') c.arms = { [st]: Math.min(MAX_PLUS, Math.max(0, (c.equip?.weapon || 1) - 1)) };
+  if (!Object.hasOwn(c.arms, st) && Object.hasOwn(c.arms, 'staff1')) {        // made when every class began with the staff: swap it for the class weapon, upgrades kept
+    c.arms[st] = c.arms.staff1; delete c.arms.staff1; if (c.held === 'staff1') c.held = st;
+  }
   if (c.equip && 'weapon' in c.equip) delete c.equip.weapon;
-  if (!armById(c.held) || !Object.hasOwn(c.arms, c.held)) c.held = Object.hasOwn(c.arms, STARTER) ? STARTER : Object.keys(c.arms).find((k) => armById(k)) || STARTER;
+  if (!armById(c.held) || !Object.hasOwn(c.arms, c.held)) c.held = Object.hasOwn(c.arms, st) ? st : Object.keys(c.arms).find((k) => armById(k)) || st;
   return c;
 }
-export const armOf = (c) => { const w = armById(c.held) && Object.hasOwn(c.arms || {}, c.held) ? ARM[c.held] : ARM[STARTER]; return [w, Object.hasOwn(c.arms || {}, w.id) ? c.arms[w.id] : 0]; };
+export const armOf = (c) => { const w = armById(c.held) && Object.hasOwn(c.arms || {}, c.held) ? ARM[c.held] : ARM[starterOf(c.cls)]; return [w, Object.hasOwn(c.arms || {}, w.id) ? c.arms[w.id] : 0]; };
 export const armDmg = (w, plus) => w.dmg * (1 + 0.05 * plus);
 export const armUpCost = (w, plus) => Math.round(18 * w.tier * Math.pow(plus + 1, 1.5));
 // a sale pays a quarter of the shop price plus 30 % of what was spent on upgrades: a bad rate on purpose
@@ -37,7 +41,7 @@ export function armError(profile, charId, op, id) {      // buy | up | equip | s
   if (!has) return 'bad';
   if (op === 'equip') { c.held = id; return null; }
   if (op === 'sell') {                           // not the one in the hand, not the free starter
-    if (c.held === id || id === STARTER) return 'held';
+    if (c.held === id || id === starterOf(c.cls)) return 'held';
     profile.coins += armSell(w, c.arms[id]); delete c.arms[id]; return null;
   }
   if (op === 'up') {

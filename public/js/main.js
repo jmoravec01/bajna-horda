@@ -1,5 +1,5 @@
 // Screens and navigation.
-import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS, ARMS, ARM, ARM_TYPES, MAX_PLUS, LEGEND_OF } from '../shared/data.js';
+import { CLASSES, CLASS, DUNGEONS, DUNGEON, SLOTS, MAX_EQUIP, MAX_CHARS, ARMS, ARM, ARM_TYPES, MAX_PLUS, LEGEND_OF, starterOf } from '../shared/data.js';
 import { charStats, power, xpNeed, upgradeCost, unlocked, validName, armOf, armDmg, armUpCost, armSell } from '../shared/meta.js';
 import { t, nm, ds, setLang, getLang, detectLang, errText } from './i18n.js';
 import { store, profile, Net, OFFLINE } from './net.js';
@@ -222,7 +222,7 @@ const SCREENS = {
   inv() {                                       // inventory and merchant: the bag of spare weapons + what the active character owns; a sale pays a bad rate
     S.args = []; const p = profile.p, c = activeChar(); if (!c) return go('chars');
     const bag = p.bag || [], sel = S.invSel && (S.invSel.src === 'bag' ? bag[S.invSel.i] && { id: bag[S.invSel.i], plus: 0 } : c.arms[S.invSel.id] !== undefined && { id: S.invSel.id, plus: c.arms[S.invSel.id] });
-    const w = sel ? ARM[sel.id] : null, fixed = w && S.invSel.src === 'char' && (armOf(c)[0].id === w.id || w.id === 'staff1');
+    const w = sel ? ARM[sel.id] : null, fixed = w && S.invSel.src === 'char' && (armOf(c)[0].id === w.id || w.id === starterOf(c.cls));
     const detail = w ? `<div class="card armdetail t${w.tier}">${armCv(w.id, sel.plus, 5)}<div class="info"><b>${esc(nm(w))}${S.invSel.src === 'char' ? ` +${sel.plus}` : ''}</b><small>${t('type_' + w.type)} · ${t('t' + w.tier)}</small><small>${t('dmg_mul')} ×${armDmg(w, sel.plus).toFixed(2)}</small><small>${perkText(w, sel.plus)}</small>${w.legend ? `<small class="gold">${t('legend_note')}</small>` : ''}</div></div>
       <div class="acts">${S.invSel.src === 'bag' ? `<button class="btn" data-op="take" ${c.arms[w.id] !== undefined ? 'disabled' : ''}>${t('give')} (${esc(c.name)})</button>` : ''}${fixed ? `<span class="maxed">${t(armOf(c)[0].id === w.id ? 'is_held' : 'is_starter')}</span>` : `<button class="btn alt" data-op="sell">${t('sell')} · ${armSell(w, sel.plus)} ◆</button>`}</div>` : `<p class="note">${t('sel_weapon')}</p>`;
     const sellable = bag.filter((id) => !ARM[id].legend), total = sellable.reduce((a, id) => a + armSell(ARM[id], 0), 0);

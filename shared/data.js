@@ -25,29 +25,29 @@ export const MAX_WEAPONS = 5, MAX_PASSIVES = 5, MAX_ITEM_LVL = 8;
 // ---- classes (all from Slavic / Czech folklore) ----
 // stats: hp / speed / dmg multipliers; trait fields are read by the sim
 export const CLASSES = [
-  { id: 'krakonos', cs: 'Krakonoš', en: 'Krakonoš', weapon: 'hul', hp: 1.35, spd: 0.9, dmg: 1, armor: 0.85, col: '#5b8c3a',
+  { id: 'krakonos', cs: 'Krakonoš', en: 'Krakonoš', weapon: 'hul', arm: 'hammer', hp: 1.35, spd: 0.9, dmg: 1, armor: 0.85, col: '#5b8c3a',
     cs_d: 'Pán hor. Tank: −15 % přijatého poškození.', en_d: 'Lord of the mountains. Tank: −15 % damage taken.' },
-  { id: 'zbojnik', cs: 'Zbojník', en: 'Outlaw', weapon: 'valaska', hp: 0.85, spd: 1.2, dmg: 1, crit: 0.2, col: '#b5651d',
+  { id: 'zbojnik', cs: 'Zbojník', en: 'Outlaw', weapon: 'valaska', arm: 'dagger', hp: 0.85, spd: 1.2, dmg: 1, crit: 0.2, col: '#b5651d',
     cs_d: 'Rychlý a obratný. +20 % rychlost, vyšší šance na krit.', en_d: 'Fast and nimble. +20 % speed, higher crit chance.' },
-  { id: 'perun', cs: 'Perun', en: 'Perun', weapon: 'blesk', hp: 1, spd: 1, dmg: 0.9, healAura: 1.5, magnet: 1.3, col: '#4a7fd4',
+  { id: 'perun', cs: 'Perun', en: 'Perun', weapon: 'blesk', arm: 'axe', hp: 1, spd: 1, dmg: 0.9, healAura: 1.5, magnet: 1.3, col: '#4a7fd4',
     cs_d: 'Hromovládce. Léčí spoluhráče v dosahu, větší dosah sběru.', en_d: 'Thunder god. Heals nearby allies, bigger pickup range.' },
-  { id: 'cert', cs: 'Čert', en: 'Devil', weapon: 'peklo', hp: 0.75, spd: 1, dmg: 1.25, burn: 0.25, armor: 1.2, col: '#c0392b',
+  { id: 'cert', cs: 'Čert', en: 'Devil', weapon: 'peklo', arm: 'spear', hp: 0.75, spd: 1, dmg: 1.25, burn: 0.25, armor: 1.2, col: '#c0392b',
     cs_d: 'Skleněné dělo. +25 % poškození, všechny zásahy pálí, ale bere o 20 % víc.', en_d: 'Glass cannon. +25 % damage, hits burn, takes 20 % more.' },
-  { id: 'bohatyr', cs: 'Bohatýr', en: 'Hero', weapon: 'kyj', hp: 1.1, spd: 1, dmg: 1, xp: 1.2, col: '#d4a017',
+  { id: 'bohatyr', cs: 'Bohatýr', en: 'Hero', weapon: 'kyj', arm: 'sword', hp: 1.1, spd: 1, dmg: 1, xp: 1.2, col: '#d4a017',
     cs_d: 'Univerzál. +20 % zkušeností z krystalů.', en_d: 'All-rounder. +20 % XP from gems.' },
-  { id: 'vedma', cs: 'Vědma', en: 'Herbwitch', weapon: 'jed', hp: 1, spd: 1, dmg: 0.95, regen: 1, heartLuck: 2, col: '#7d3c98',
+  { id: 'vedma', cs: 'Vědma', en: 'Herbwitch', weapon: 'jed', arm: 'wand', hp: 1, spd: 1, dmg: 0.95, regen: 1, heartLuck: 2, col: '#7d3c98',
     cs_d: 'Léčitelka. Regenerace 1 HP/s, srdíčka padají častěji.', en_d: 'Healer. 1 HP/s regeneration, hearts drop more often.' },
-  { id: 'hastrman', cs: 'Hastrman', en: 'Water Goblin', weapon: 'louze', hp: 1, spd: 1, dmg: 0.95, zoneSlow: 0.4, swim: 1.1, col: '#1f8a8a',
+  { id: 'hastrman', cs: 'Hastrman', en: 'Water Goblin', weapon: 'louze', arm: 'flail', hp: 1, spd: 1, dmg: 0.95, zoneSlow: 0.4, swim: 1.1, col: '#1f8a8a',
     cs_d: 'Vodník. Louže zpomalují o 40 %, ve vodě je rychlejší.', en_d: 'Master of puddles. Puddles slow by 40 %, faster while in water.' },
-  { id: 'polednice', cs: 'Polednice', en: 'Noon Witch', weapon: 'poledne', hp: 0.95, spd: 1, dmg: 1, ramp: 1, col: '#e8d44d',
+  { id: 'polednice', cs: 'Polednice', en: 'Noon Witch', weapon: 'poledne', arm: 'scythe', hp: 0.95, spd: 1, dmg: 1, ramp: 1, col: '#e8d44d',
     cs_d: 'Časem sílí: poškození roste až o +60 %, první 2 minuty je slabší.', en_d: 'Grows stronger: damage up to +60 % over the run, weak for the first 2 minutes.' },
-  { id: 'golem', cs: 'Golem', en: 'Golem', weapon: 'pest', hp: 1.7, spd: 0.75, dmg: 1, armor: 0.9, knock: 1.5, col: '#8d8d7a',
+  { id: 'golem', cs: 'Golem', en: 'Golem', weapon: 'pest', arm: 'mace', hp: 1.7, spd: 0.75, dmg: 1, armor: 0.9, knock: 1.5, col: '#8d8d7a',
     cs_d: 'Pražský kolos. Hodně HP, −10 % poškození, pěst odhazuje víc.', en_d: 'Colossus of Prague. Huge HP, −10 % damage taken, stronger knockback.' },
-  { id: 'rarasek', cs: 'Rarášek', en: 'Rarášek', weapon: 'cepice', hp: 0.9, spd: 1.05, dmg: 1, dodge: 0.15, coins: 1.3, blink: 1, col: '#e67e22',
+  { id: 'rarasek', cs: 'Rarášek', en: 'Rarášek', weapon: 'cepice', arm: 'bow', hp: 0.9, spd: 1.05, dmg: 1, dodge: 0.15, coins: 1.3, blink: 1, col: '#e67e22',
     cs_d: 'Šejdíř. 15 % úhyb, +30 % mincí, při zásahu cvakne pryč.', en_d: 'Trickster. 15 % dodge, +30 % coins, blinks away when hit.' },
-  { id: 'morana', cs: 'Morana', en: 'Morana', weapon: 'led', hp: 0.95, spd: 1, dmg: 0.85, freeze: 1, col: '#aee1f5',
+  { id: 'morana', cs: 'Morana', en: 'Morana', weapon: 'led', arm: 'staff', hp: 0.95, spd: 1, dmg: 0.85, freeze: 1, col: '#aee1f5',
     cs_d: 'Zima. Každých 10 s zmrazí okolní nepřátele na 2 s.', en_d: 'Winter. Every 10 s freezes nearby enemies for 2 s.' },
-  { id: 'baba', cs: 'Bába Jaga', en: 'Baba Yaga', weapon: 'chaloupka', hp: 1, spd: 0.95, dmg: 0.75, extra: 1, col: '#6b4f2a',
+  { id: 'baba', cs: 'Bába Jaga', en: 'Baba Yaga', weapon: 'chaloupka', arm: 'club', hp: 1, spd: 0.95, dmg: 0.75, extra: 1, col: '#6b4f2a',
     cs_d: 'Přivolává pomocníky. +1 chaloupka, vlastní zbraně slabší.', en_d: 'Summoner. +1 hut, weaker own weapons.' },
 ];
 export const CLASS = Object.fromEntries(CLASSES.map((c) => [c.id, c]));
@@ -184,4 +184,5 @@ const LEGENDS = [
 for (const [dun, type, dmg, perkVal, price, cs, en] of LEGENDS) ARMS.push({ id: type + '5', type, tier: 5, legend: dun, cs, en, dmg, perk: ARM_TYPES[type].perk, perkVal, need: 1, price });
 export const ARM = Object.fromEntries(ARMS.map((w) => [w.id, w]));
 export const LEGEND_OF = Object.fromEntries(ARMS.filter((w) => w.legend).map((w) => [w.legend, w.id]));
-export const STARTER = 'staff1';          // every character starts with it (free)
+// every character starts with the free tier-1 weapon of its class (a tank does not begin with a wooden staff)
+export const starterOf = (cls) => (CLASS[cls]?.arm || 'staff') + '1';

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Sim } from '../shared/sim.js';
-import { LEGEND_OF, CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, BOSS_STAGES, ARMS, ARM, ARM_TIERS, MAX_PLUS, STARTER } from '../shared/data.js';
+import { LEGEND_OF, CLASSES, DUNGEON, DUNGEONS, WEAPONS, ARCH, DT, BOSS_STAGES, ARMS, ARM, ARM_TIERS, MAX_PLUS, starterOf } from '../shared/data.js';
 import { newChar, power, charStats, applyRun, upgradeEquip, armError, armSell, armOf, armDmg, armUpCost, fixArms, createChar, newProfile, xpNeed, runReward, validName, unlocked } from '../shared/meta.js';
 import { runBot } from '../tools/bot.js';
 
@@ -106,14 +106,16 @@ test('meta: rewards, levels, unlocks, equipment, character limits', () => {
 
 test('armory: 48 shop weapons + 7 legendary, unique ids, buy / equip / upgrade to +9, stronger weapon = stronger hero', () => {
   assert.equal(ARMS.length, 55); assert.equal(new Set(ARMS.map((w) => w.id)).size, 55); assert.equal(ARMS.filter((w) => !w.legend).length, 48);
-  assert.ok(ARM[STARTER] && ARM[STARTER].tier === 1);
+  assert.ok(CLASSES.every((k) => ARM[starterOf(k.id)]?.tier === 1));                  // every class has a tier-1 starter
+  assert.equal(new Set(CLASSES.map((k) => starterOf(k.id))).size, CLASSES.length);   // and no two share one
+  assert.equal(starterOf('krakonos'), 'hammer1');                                     // the tank is not given a wooden staff
   const p = newProfile(); createChar(p, 'Kuba', 'perun', 1); const c = p.chars[0];
-  assert.deepEqual([c.held, c.arms], [STARTER, { [STARTER]: 0 }]);
+  assert.deepEqual([c.held, c.arms], ['axe1', { axe1: 0 }]);
   p.coins = 1e6; c.level = 50;
   assert.equal(armError(p, 1, 'buy', 'sword4'), null); assert.equal(armError(p, 1, 'buy', 'sword4'), 'owned');
   const before = charStats(c).dmg, pw = power(c);
   assert.equal(armError(p, 1, 'equip', 'sword4'), null); assert.equal(c.held, 'sword4');
-  assert.ok(charStats(c).dmg > before * 1.7 && power(c) > pw);
+  assert.ok(charStats(c).dmg > before * 1.5 && power(c) > pw);
   for (let i = 0; i < MAX_PLUS; i++) assert.equal(armError(p, 1, 'up', 'sword4'), null);
   assert.equal(armError(p, 1, 'up', 'sword4'), 'max'); assert.equal(c.arms.sword4, MAX_PLUS);
   const [w, plus] = armOf(c); assert.ok(Math.abs(armDmg(w, plus) - w.dmg * 1.45) < 1e-9);
@@ -121,7 +123,9 @@ test('armory: 48 shop weapons + 7 legendary, unique ids, buy / equip / upgrade t
   c.level = 1; assert.equal(armError(p, 1, 'buy', 'axe2'), 'level');
   p.coins = 0; c.level = 50; assert.equal(armError(p, 1, 'buy', 'axe2'), 'poor');
   const old = { equip: { weapon: 5, armor: 2, ring: 1, boots: 1 }, level: 1 }; fixArms(old);   // legacy numeric weapon level
-  assert.deepEqual([old.held, old.arms, 'weapon' in old.equip], [STARTER, { [STARTER]: 4 }, false]);
+  assert.deepEqual([old.held, old.arms, 'weapon' in old.equip], ['staff1', { staff1: 4 }, false]);
+  const tank = { cls: 'krakonos', equip: {}, level: 3, arms: { staff1: 5, sword2: 1 }, held: 'staff1' }; fixArms(tank);   // pre-class-starter character: staff becomes the class weapon, +5 kept
+  assert.deepEqual([tank.held, tank.arms], ['hammer1', { hammer1: 5, sword2: 1 }]); fixArms(tank); assert.deepEqual(tank.arms, { hammer1: 5, sword2: 1 });
   assert.ok(ARM_TIERS.every((t, i) => !i || t.dmg > ARM_TIERS[i - 1].dmg));
 });
 
@@ -167,7 +171,7 @@ test('merchant: a sale pays a bad rate, the held and the starter weapon stay, a 
   const paid = armSell(ARM.axe2, 1); assert.ok(paid < ARM.axe2.price / 2 && paid >= ARM.axe2.price / 4);
   const coins = p.coins; assert.equal(armError(p, 1, 'sell', 'axe2'), null); assert.equal(p.coins, coins + paid); assert.equal(c.arms.axe2, undefined);
   assert.equal(armError(p, 1, 'sell', 'axe2'), 'bad');
-  assert.equal(armError(p, 1, 'sell', STARTER), 'held');
+  assert.equal(armError(p, 1, 'sell', 'axe1'), 'held');
   armError(p, 1, 'buy', 'axe2'); armError(p, 1, 'equip', 'axe2'); assert.equal(armError(p, 1, 'sell', 'axe2'), 'held');
 });
 

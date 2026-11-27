@@ -12,7 +12,6 @@ const out = {
   boss_stages: { single: D.BOSS_STAGES, team: D.TEAM_STAGES },
   legend_of: D.LEGEND_OF,
   slots: D.SLOTS,
-  starter: D.STARTER,
   arms: D.ARMS.map((w) => ({ id: w.id, tier: w.tier, dmg: w.dmg, perk: w.perk, perk_val: w.perkVal, need: w.need, price: w.price, legend: w.legend ?? null })),
 };
 writeFileSync(new URL('../server-rs/data.json', import.meta.url), JSON.stringify(out, null, 1) + '\n');

@@ -64,9 +64,9 @@ test('characters: create, limit, delete, upgrade, other accounts are untouchable
   assert.equal((await arm('buy', 'sword1')).j.error, 'poor');
   assert.equal((await arm('buy', 'nope')).j.error, 'bad');
   assert.equal((await arm('equip', 'sword1')).j.error, 'bad');                 // not owned
-  assert.equal((await arm('up', 'staff1')).j.error, 'poor');
+  assert.equal((await arm('up', 'wand1')).j.error, 'poor');
   assert.equal((await arm('buy', 'sword1', b.token)).j.error, 'bad');          // another account's character
-  const ch0 = pa.chars[0]; assert.deepEqual([ch0.held, ch0.arms], ['staff1', { staff1: 0 }]);
+  const ch0 = pa.chars[0]; assert.deepEqual([ch0.held, ch0.arms], ['wand1', { wand1: 0 }]);
   assert.equal((await api('POST', 'chars/delete', { id }, b.token)).status, 200);   // not his: no effect
   assert.equal((await api('GET', 'me', null, a.token)).j.profile.chars.length, 8);
   await api('POST', 'chars/delete', { id }, a.token);
@@ -98,7 +98,7 @@ test('co-op: host + guest + friend, run, snapshots, rewards, leaving', async () 
   H.send({ t: 'dun', dun: 'm3' });                                                           // locked dungeon: ignored
   H.send({ t: 'start' });
   const st = await H.next((m) => m.t === 'start'); assert.equal(st.dun, 'm1'); assert.equal(st.players.length, 3);
-  assert.ok(st.players.every((x) => x.arm === 'staff1' && x.plus === 0));     // everybody sees the weapon in the others' hands
+  assert.deepEqual(st.players.map((x) => [x.cls, x.arm, x.plus]).sort(), [['krakonos', 'hammer1', 0], ['morana', 'staff1', 0], ['perun', 'axe1', 0]]);     // everybody sees the weapon in the others' hands
   await F.next((m) => m.t === 'start'); await G.next((m) => m.t === 'start');
   const late = await wsc('nick=Late&cls=perun'); late.send({ t: 'join', code: h.room }); assert.equal((await late.next((m) => m.t === 'err')).code, 'in_run'); late.ws.close();
   H.send({ t: 'in', dx: 1, dy: 0 }); H.send({ t: 'pick', i: 0 }); H.send({ t: 'in', dx: 'x', dy: null }); H.send({ t: '__proto__' }); H.ws.send('not json');
@@ -164,7 +164,7 @@ test('merchant and bag: the profile carries an empty bag, bad sales are refused,
   const me = (await api('GET', 'me', null, a.token)).j.profile; const id = me.chars[0].id;
   assert.deepEqual(me.bag, []); assert.deepEqual(me.progress, { single: 1, multi: 1 });
   const arm = (op, wid) => api('POST', 'arm', { charId: id, op, id: wid }, a.token), bag = (op, i) => api('POST', 'bag', { charId: id, op, i }, a.token);
-  assert.equal((await arm('sell', 'staff1')).status, 400);       // the free starter is not for sale
+  assert.equal((await arm('sell', 'sword1')).status, 400);       // the free starter (bohatyr: sword) is not for sale
   assert.equal((await arm('buy', 'club5')).status, 400);         // a legendary weapon cannot be bought
   assert.equal((await arm('sell', 'sword4')).status, 400);       // not owned
   assert.equal((await bag('sell', 0)).status, 400); assert.equal((await bag('take', 0)).status, 400); assert.equal((await bag('nope', 0)).status, 400);

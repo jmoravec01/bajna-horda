@@ -16,6 +16,7 @@
   {
    "id": "krakonos",
    "weapon": "hul",
+   "arm": "hammer",
    "hp": 1.35,
    "spd": 0.9,
    "dmg": 1,
@@ -24,6 +25,7 @@
   {
    "id": "zbojnik",
    "weapon": "valaska",
+   "arm": "dagger",
    "hp": 0.85,
    "spd": 1.2,
    "dmg": 1,
@@ -32,6 +34,7 @@
   {
    "id": "perun",
    "weapon": "blesk",
+   "arm": "axe",
    "hp": 1,
    "spd": 1,
    "dmg": 0.9,
@@ -41,6 +44,7 @@
   {
    "id": "cert",
    "weapon": "peklo",
+   "arm": "spear",
    "hp": 0.75,
    "spd": 1,
    "dmg": 1.25,
@@ -50,6 +54,7 @@
   {
    "id": "bohatyr",
    "weapon": "kyj",
+   "arm": "sword",
    "hp": 1.1,
    "spd": 1,
    "dmg": 1,
@@ -58,6 +63,7 @@
   {
    "id": "vedma",
    "weapon": "jed",
+   "arm": "wand",
    "hp": 1,
    "spd": 1,
    "dmg": 0.95,
@@ -67,6 +73,7 @@
   {
    "id": "hastrman",
    "weapon": "louze",
+   "arm": "flail",
    "hp": 1,
    "spd": 1,
    "dmg": 0.95,
@@ -76,6 +83,7 @@
   {
    "id": "polednice",
    "weapon": "poledne",
+   "arm": "scythe",
    "hp": 0.95,
    "spd": 1,
    "dmg": 1,
@@ -84,6 +92,7 @@
   {
    "id": "golem",
    "weapon": "pest",
+   "arm": "mace",
    "hp": 1.7,
    "spd": 0.75,
    "dmg": 1,
@@ -93,6 +102,7 @@
   {
    "id": "rarasek",
    "weapon": "cepice",
+   "arm": "bow",
    "hp": 0.9,
    "spd": 1.05,
    "dmg": 1,
@@ -103,6 +113,7 @@
   {
    "id": "morana",
    "weapon": "led",
+   "arm": "staff",
    "hp": 0.95,
    "spd": 1,
    "dmg": 0.85,
@@ -111,6 +122,7 @@
   {
    "id": "baba",
    "weapon": "chaloupka",
+   "arm": "club",
    "hp": 1,
    "spd": 0.95,
    "dmg": 0.75,
@@ -761,7 +773,6 @@
   "ring",
   "boots"
  ],
- "starter": "staff1",
  "arms": [
   {
    "id": "sword1",

@@ -1,5 +1,5 @@
 // Meta progression: character stats, levels, equipment, run rewards. Port of shared/meta.js.
-use crate::data::{self, arm, class, data, dungeon, dungeon_index, mode_len, Arm};
+use crate::data::{self, arm, class, data, dungeon, dungeon_index, mode_len, starter_of, Arm};
 use std::collections::BTreeMap;
 use regex::Regex;
 use std::sync::OnceLock;
@@ -49,7 +49,7 @@ impl Profile {
 
 pub fn new_char(id: i64, name: &str, cls: &str) -> Char {
     Char { id, name: name.to_string(), cls: cls.to_string(), level: 1, xp: 0, equip: Equip::new(),
-        arms: BTreeMap::from([(data().starter.clone(), 0)]), held: data().starter.clone() }
+        arms: BTreeMap::from([(starter_of(cls), 0)]), held: starter_of(cls) }
 }
 pub fn new_profile() -> Profile {
     Profile { coins: 0, chars: vec![], single: 1, multi: 1, bag: vec![] }
@@ -70,15 +70,17 @@ pub fn js_round(x: f64) -> f64 { (x + 0.5).floor() }
 
 /// Legacy characters (no armory yet) get the starter weapon at +(old weapon level - 1).
 pub fn fix_arms(c: &mut Char, arms: Option<BTreeMap<String, u32>>, legacy_weapon: u32) {
-    let d = data();
-    c.arms = arms.unwrap_or_else(|| BTreeMap::from([(d.starter.clone(), legacy_weapon.max(1).saturating_sub(1).min(d.consts.max_plus))]));
+    let (d, st) = (data(), starter_of(&c.cls));
+    c.arms = arms.unwrap_or_else(|| BTreeMap::from([(st.clone(), legacy_weapon.max(1).saturating_sub(1).min(d.consts.max_plus))]));
+    if !c.arms.contains_key(&st) {      // made when every class began with the staff: swap it for the class weapon, upgrades kept
+        if let Some(plus) = c.arms.remove("staff1") { c.arms.insert(st.clone(), plus); if c.held == "staff1" { c.held = st.clone(); } }
+    }
     if arm(&c.held).is_none() || !c.arms.contains_key(&c.held) {
-        c.held = if c.arms.contains_key(&d.starter) { d.starter.clone() } else { c.arms.keys().find(|k| arm(k).is_some()).cloned().unwrap_or_else(|| d.starter.clone()) };
+        c.held = if c.arms.contains_key(&st) { st.clone() } else { c.arms.keys().find(|k| arm(k).is_some()).cloned().unwrap_or(st) };
     }
 }
 pub fn arm_of(c: &Char) -> (&'static Arm, u32) {
-    let d = data();
-    let w = if c.arms.contains_key(&c.held) { arm(&c.held) } else { None }.or_else(|| arm(&d.starter)).expect("starter");
+    let w = if c.arms.contains_key(&c.held) { arm(&c.held) } else { None }.or_else(|| arm(&starter_of(&c.cls))).expect("starter");
     (w, c.arms.get(&w.id).copied().unwrap_or(0))
 }
 pub fn arm_dmg(w: &Arm, plus: u32) -> f64 { w.dmg * (1.0 + 0.05 * plus as f64) }
@@ -122,7 +124,7 @@ pub fn arm_error(p: &mut Profile, char_id: i64, op: &str, id: &str) -> Option<&'
         }
         "equip" if has => { p.chars[idx].held = id.to_string(); None }
         "sell" if has => {                // not the one in the hand, not the free starter
-            if p.chars[idx].held == id || id == data().starter { return Some("held"); }
+            if p.chars[idx].held == id || id == starter_of(&p.chars[idx].cls) { return Some("held"); }
             let plus = p.chars[idx].arms.remove(id).unwrap_or(0);
             p.coins += arm_sell(w, plus); None
         }
@@ -287,7 +289,16 @@ mod tests {
         assert_eq!(arm_error(&mut p, 1, "buy", "axe2"), None); assert_eq!(arm_error(&mut p, 1, "up", "axe2"), None);
         let paid = arm_sell(arm("axe2").unwrap(), 1); assert!(paid < arm("axe2").unwrap().price / 2);
         let c = p.coins; assert_eq!(arm_error(&mut p, 1, "sell", "axe2"), None); assert_eq!(p.coins, c + paid);
-        assert_eq!(arm_error(&mut p, 1, "sell", "staff1"), Some("held"));
+        let st = starter_of(&p.chars[0].cls); assert_eq!(arm_error(&mut p, 1, "sell", &st), Some("held"));
         assert_eq!(arm_error(&mut p, 1, "buy", "spear5"), Some("bad"));
+    }
+    #[test]
+    fn class_starters_and_old_staff_migration() {
+        assert_eq!(starter_of("krakonos"), "hammer1");
+        let mut c = new_char(1, "Tank", "krakonos"); assert_eq!((c.held.as_str(), c.arms.len()), ("hammer1", 1));
+        // a character made when every class began with the staff: it becomes the class weapon, upgrades kept, idempotent
+        let old = BTreeMap::from([("staff1".to_string(), 5), ("sword2".to_string(), 1)]);
+        c.held = "staff1".into(); fix_arms(&mut c, Some(old), 1); let a = c.arms.clone(); fix_arms(&mut c, Some(a), 1);
+        assert_eq!((c.held.as_str(), c.arms.get("hammer1").copied(), c.arms.contains_key("staff1")), ("hammer1", Some(5), false));
     }
 }
