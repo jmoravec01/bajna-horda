@@ -99,16 +99,16 @@ export const ARCH = {
 // ---- dungeons ----
 // roster: [arch, palette[main, dark, accent], appears-at-seconds, weight]; the last two entries are the elite and the boss
 // team dungeons (mode 'multi') get 10-minute runs, shrines to hold and a pace of their own; single ones keep the 5-minute defaults
-const dun = (o) => (o.mode === 'multi' ? { secs: TEAM_SECONDS, stages: TEAM_STAGES, shrines: 3, pace: 0.9, spawn: 1.2, ...o } : { secs: RUN_SECONDS, stages: BOSS_STAGES, shrines: 0, pace: PACE, spawn: 1, ...o });
+const dun = (o) => (o.mode === 'multi' ? { secs: TEAM_SECONDS, stages: TEAM_STAGES, shrines: 3, pace: 0.9, spawn: 1.2, ...o } : { secs: RUN_SECONDS, stages: BOSS_STAGES, shrines: 0, pace: PACE, spawn: 1.25, ...o });
 export const DUNGEONS = {
   single: [
-    dun({ id: 's1', mode: 'single', cs: 'Louka', en: 'Meadow', diff: 1.0, xp: 1, bg: ['#3d7a3a', '#356d33', '#4f8f45', '#2d5e2b'], deco: 'grass',
+    dun({ id: 's1', mode: 'single', cs: 'Louka', en: 'Meadow', diff: 1.3, xp: 1, bg: ['#3d7a3a', '#356d33', '#4f8f45', '#2d5e2b'], deco: 'grass',
       roster: [['slime', ['#6fd45a', '#2c7a22', '#fff'], 0, 6], ['bat', ['#8b5a3c', '#4a2c18', '#e33'], 40, 3], ['wolf', ['#8a8f99', '#4a4f59', '#ee5'], 100, 3], ['boar', ['#7a4a2a', '#3a2010', '#fff'], 190, 2], ['ogre', ['#6a9a5a', '#2d4a24', '#ee5'], 280, 1]],
       elite: ['ogre', ['#c05a3a', '#5a2a1a', '#ff0']], boss: { arch: 'ogre', pal: ['#d4a017', '#6b4a05', '#f33'], names: ['Bořivoj', 'Spytihněv', 'Vratislav'], designs: ['fox', 'boar', 'tur'], hp: 1800 } }),
-    dun({ id: 's2', mode: 'single', cs: 'Krypta', en: 'Crypt', diff: 1.35, xp: 1.3, bg: ['#3a3548', '#322d40', '#46405a', '#2a2636'], deco: 'bones',
+    dun({ id: 's2', mode: 'single', cs: 'Krypta', en: 'Crypt', diff: 1.65, xp: 1.3, bg: ['#3a3548', '#322d40', '#46405a', '#2a2636'], deco: 'bones',
       roster: [['skel', ['#e8e4d0', '#8a8670', '#e33'], 0, 6], ['bat', ['#5a4a7a', '#2a2040', '#8ef'], 30, 3], ['ghost', ['#b8d8f0', '#5a7a9a', '#fff'], 90, 3], ['spider', ['#4a3a4a', '#1a101a', '#e3e'], 170, 2], ['ogre', ['#8a7a9a', '#3a2a4a', '#8ef'], 270, 1]],
       elite: ['ogre', ['#6a6a8a', '#2a2a4a', '#ff0']], boss: { arch: 'skel', pal: ['#c8b8f0', '#4a3a7a', '#f3f'], names: ['Soběslav', 'Ctibor', 'Vladislav'], designs: ['havran', 'zmije', 'kun'], hp: 2600, scale: 3 } }),
-    dun({ id: 's3', mode: 'single', cs: 'Sopka', en: 'Volcano', diff: 1.8, xp: 1.7, bg: ['#4a2a22', '#3e2019', '#5c3328', '#2e1812'], deco: 'lava',
+    dun({ id: 's3', mode: 'single', cs: 'Sopka', en: 'Volcano', diff: 1.9, xp: 1.7, bg: ['#4a2a22', '#3e2019', '#5c3328', '#2e1812'], deco: 'lava',
       roster: [['imp', ['#e8502a', '#7a1a0a', '#ff0'], 0, 6], ['bat', ['#8a2a1a', '#3a0a05', '#fa0'], 30, 3], ['wolf', ['#3a2a2a', '#150a0a', '#f80'], 90, 3], ['boar', ['#b03a1a', '#4a1008', '#fd0'], 170, 2], ['ogre', ['#5a3a3a', '#1a0f0f', '#f60'], 260, 1]],
       elite: ['ogre', ['#e8502a', '#5a1005', '#ff0']], boss: { arch: 'ogre', pal: ['#f0a020', '#7a2005', '#fff'], names: ['Bohuslav', 'Václav', 'Jindřich'], designs: ['mlok', 'kohout', 'zarptak'], hp: 3600, scale: 2.6 } }),
   ],
