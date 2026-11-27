@@ -3,7 +3,7 @@ import { Sim, weaponStats } from '../shared/sim.js';
 import { DT, DUNGEON, WEAPONS, PASSIVE, WEAPON_IDX } from '../shared/data.js';
 import { Scene, render } from './render.js';
 import { objSprite, passiveSprite, text } from './sprites.js';
-import { sfx, music, roar } from './audio.js';
+import { setTempo, sfx, music, roar } from './audio.js';
 import { t, nm, dd } from './i18n.js';
 
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -182,7 +182,7 @@ export class Run {
       switch (v[0]) {
         case 'h': sfx('hit'); break; case 'd': sfx(v[3] ? 'boom' : 'kill'); break; case 'g': sfx('gem'); break; case '$': sfx('coin'); break; case '+': sfx('heart'); break;
         case 'L': case 'C': sfx('level'); break; case 'u': sfx('hurt'); break; case 'x': sfx('die'); break;
-        case 'B': { const n = this.dunData.stages.length, k = v[1] || n; sfx('boss'); this.callAt[k] = performance.now(); roar(this.dunData.boss.designs[k - 1], k < n); this.bossName = this.dunData.boss.names[k - 1]; this.toast(`${t('boss')} ${k}/${n} · ${this.bossName}`); break; }
+        case 'B': { const n = this.dunData.stages.length, k = v[1] || n; sfx('boss'); this.callAt[k] = performance.now(); roar(this.dunData.boss.designs[k - 1], k < n); setTempo(1 + 0.33 * k); this.bossName = this.dunData.boss.names[k - 1]; this.toast(`${t('boss')} ${k}/${n} · ${this.bossName}`); break; }
         case 'S': sfx(v[2] ? 'level' : 'boss'); this.toast(`${t(v[2] ? 'shrine_on' : 'shrine_lost')} · ${snap.sh.filter((h) => h[3]).length}/${snap.sh.length}`); break;
         case 'b': sfx('boom'); break; case 'c': sfx('zap'); break; case 'r': case 'M': sfx('pulse'); break;
       }

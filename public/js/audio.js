@@ -18,7 +18,7 @@ function unlock() {
   const c = ensure(); if (!c) return;
   if (c.state !== 'running') c.resume();
   const b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0);
-  if (c.state === 'running' && want) startMusic();
+  if (c.state === 'running' && want && !song) startMusic();     // never restart a tune that is already playing
 }
 for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) document.addEventListener(ev, unlock, { capture: true });
 
@@ -60,7 +60,7 @@ export function sfx(name) {
 }
 
 // music: each place plays its own score (score.js), scheduled a little ahead on the audio clock so the timing does not drift
-let song = null, pos = 0, nextT = 0;
+let song = null, pos = 0, nextT = 0, tempo = 1;
 function note(f, dur, type, vol, delay, sus, det) {
   const c = ctx, t = c.currentTime + delay, g = c.createGain(), n = det ? 2 : 1;
   g.connect(musicGain);
@@ -81,11 +81,12 @@ function pump() {
     const d = nextT - ctx.currentTime;
     for (const v of song.voices) for (const [m, l] of v.ev.get(pos) || []) note(freq(m), l * song.step, v.w, v.vol, d, v.sus, v.det);
     if (song.drums) drum(song.drums[pos % song.drums.length], d);
-    pos = (pos + 1) % song.len; nextT += song.step;
+    pos = (pos + 1) % song.len; nextT += song.step / tempo;
   }
 }
 function startMusic() { clearInterval(timer); song = compile(SCORES[want] || SCORES.menu); pos = 0; nextT = ctx.currentTime + 0.08; pump(); timer = setInterval(pump, 80); }
-export function music(name) { if (name === want) return; want = name; clearInterval(timer); song = null; if (ctx && ctx.state === 'running' && name) startMusic(); }
+export function setTempo(x) { tempo = x; }   // 1 = written speed; the game speeds the tune up with every boss
+export function music(name) { if (name === want) return; want = name; tempo = 1; clearInterval(timer); song = null; if (ctx && ctx.state === 'running' && name) startMusic(); }
 export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; }
 export const isMuted = () => muted;
 
