@@ -254,14 +254,18 @@ const SCREENS = {
     const chars = !profile.isGuest && profile.p.chars.length > 1 ? `<select id="chsel">${profile.p.chars.map((x) => `<option value="${x.id}" ${me && x.id === me.charId ? 'selected' : ''}>${esc(x.name)} · ${t('level')} ${x.level}</option>`).join('')}</select>` : '';
     const link = location.origin + location.pathname + '#/room/' + r.code;
     view(`<div class="screen lobby"><div class="top"><button class="icon-btn" data-act="leave">‹</button><span class="who">${t('room_of')} ${esc(r.hostName)}</span><span class="coins">${profile.p ? Math.floor(profile.p.coins) : 0} ◆</span><button class="icon-btn" data-act="snd">♪${isMuted() ? '<i class="mute"></i>' : ''}</button></div>
-      <div class="card"><p class="note">${t('invite')}</p><div class="faces">${faces(r.code, 5)}</div><button class="btn small" data-act="copy">${t('copy')}</button></div>
+      <div class="card"><p class="note">${t('invite')}</p><div class="faces">${faces(r.code, 5)}</div><div class="row"><button class="btn small" data-act="copy">${t('copy')}</button>${navigator.share ? `<button class="btn small alt" data-act="share">${t('share')}</button>` : ''}</div><input class="linkbox" id="linkbox" readonly hidden value="${esc(link)}"></div>
       <h3>${t('players')} ${r.members.length}/6</h3><div class="mems">${members}</div>${chars ? `<label class="lab">${t('mychar')}${chars}</label>` : ''}
       <h3>${t('pick_dun')}</h3><div class="duns row3">${duns}</div><p class="note">${r.dun === 'r1' ? t('raid_rules') : t('team_rules')}</p>
       ${host ? `<button class="btn big" data-act="go">${t('start')}</button>` : `<p class="note">${t('waiting')}</p>`}${profile.isGuest ? `<p class="note">${t('guest_mp')}</p>` : ''}</div>`, (root) => wire(root, (e) => {
       const d = e.target.closest('[data-d]'); if (d) { S.net.send({ t: 'dun', dun: d.dataset.d }); sfx('click'); }
       if (e.target.closest('[data-act=go]')) S.net.send({ t: 'start' });
       if (e.target.closest('[data-act=leave]')) leaveRoom();
-      if (e.target.closest('[data-act=copy]')) { if (navigator.share && matchMedia('(pointer: coarse)').matches) navigator.share({ url: link }).catch(() => {}); else navigator.clipboard?.writeText(link).catch(() => {}); e.target.closest('button').textContent = t('copied'); }
+      if (e.target.closest('[data-act=share]')) navigator.share({ url: link }).catch(() => {});
+      if (e.target.closest('[data-act=copy]')) {
+        const btn = e.target.closest('button'), box = root.querySelector('#linkbox');
+        copyText(link).then((ok) => { if (ok) btn.textContent = t('copied'); else { box.hidden = false; box.focus(); box.select(); box.setSelectionRange(0, link.length); } });   // insecure origin (http on the LAN) has no clipboard API: show the link selected
+      }
     }));
     const sel = $app.querySelector('#chsel'); if (sel) sel.onchange = () => { store.d.active = +sel.value; store.save(); S.net.send({ t: 'char', id: +sel.value }); };
   },
@@ -299,6 +303,13 @@ function charCard(c, compact) {
 }
 
 // ---------- flows ----------
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); return true; } catch { /* no clipboard API (http) or denied: fall back to a selection */ }
+  const ta = document.createElement('textarea'); ta.value = s; ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.append(ta);
+  ta.select(); ta.setSelectionRange(0, s.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch { /* ignore */ }
+  ta.remove(); return ok;
+}
 async function afterLogin() {
   const hash = location.hash.match(/^#\/room\/([A-Za-z0-9]+)/);
   if (!profile.p.chars.length) { go('create'); return; }
