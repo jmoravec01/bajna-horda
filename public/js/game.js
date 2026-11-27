@@ -98,11 +98,14 @@ export class Run {
   }
 
   resize() {
-    const cw = Math.min(window.innerWidth, 500), s = Math.max(2, Math.round(cw / 190));
-    const W = Math.floor(cw / s), H = Math.min(480, Math.floor(window.innerHeight / s));
+    const wide = window.innerWidth > 700;                  // desktop window: fill all of it, ~270 px of world high and at most 540 wide (the server only sends what is within 290 px of the hero)
+    const cw = wide ? window.innerWidth : Math.min(window.innerWidth, 500), s = wide ? Math.max(2, Math.round(window.innerHeight / 270), Math.ceil(window.innerWidth / 540)) : Math.max(2, Math.round(cw / 190));
+    const W = Math.floor(cw / s), H = wide ? Math.floor(window.innerHeight / s) : Math.min(480, Math.floor(window.innerHeight / s));
     this.W = this.cv.width = W; this.H = this.cv.height = H; this.s = s;
     this.cv.style.width = W * s + 'px'; this.cv.style.height = H * s + 'px';
     this.ctx.imageSmoothingEnabled = false;
+    const z = wide ? s / 2 : 1;                           // the HUD is CSS-sized: grow it with the pixel scale on a big window
+    for (const el of this.root.querySelectorAll('.hud, .sheet')) el.style.zoom = z;
   }
 
   curDir() {

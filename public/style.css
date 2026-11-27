@@ -3,6 +3,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: Jersey, 'Courier New', monospace; font-synthesis: none; font-size: 17px; overscroll-behavior: none; }
 body { overflow: hidden; }
+#app:has(.play) { max-width: none; }
 #app { height: 100dvh; max-width: 500px; margin: 0 auto; overflow-y: auto; overflow-x: hidden; position: relative; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 h1, h2, h3, p { margin: 0; }
 h2 { font-size: 20px; margin: 6px 0; } h3 { font-size: 15px; color: var(--dim); margin: 10px 0 4px; font-weight: 500; }

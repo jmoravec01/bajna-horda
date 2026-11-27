@@ -4,7 +4,7 @@ use crate::meta::{char_stats, js_round, power, Char, Stats};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-pub const CULL: f64 = 270.0;
+pub const CULL: f64 = 290.0;     // a full-HD window shows up to ~275 px from the hero
 const BASE_SPEED: f64 = 52.0;
 const BASE_HP: f64 = 100.0;
 const PICKUP_R: f64 = 26.0;
