@@ -1186,6 +1186,38 @@ mod tests {
         }
     }
 
+    /// One scenario, one JSON line. HORDE_DUN=s2 HORDE_LVLS=8 (one level per player: "12,12,12")
+    /// HORDE_CLASSES=perun,vedma,golem (optional fixed party; else every class leads once, others rotate in)
+    /// HORDE_BOT=normal|idle   HORDE_SEEDS=30 HORDE_SEED0=0
+    /// cargo test --release sweep -- --ignored --nocapture | grep '^{'
+    #[test]
+    #[ignore]
+    fn sweep() {
+        let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.to_string());
+        let dun = env("HORDE_DUN", "s1");
+        let lvls: Vec<u32> = env("HORDE_LVLS", "1").split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        let fixed: Vec<String> = env("HORDE_CLASSES", "").split(',').filter(|v| !v.is_empty()).map(String::from).collect();
+        let (seeds, seed0): (u32, u32) = (env("HORDE_SEEDS", "10").parse().unwrap_or(10), env("HORDE_SEED0", "0").parse().unwrap_or(0));
+        let idle = env("HORDE_BOT", "normal") == "idle";
+        assert!(!lvls.is_empty() && (fixed.is_empty() || fixed.len() == lvls.len()), "HORDE_CLASSES needs one class per level");
+        let parties: Vec<Vec<String>> = if fixed.is_empty() { (0..data().classes.len()).map(|ci| (0..lvls.len()).map(|i| data().classes[(ci + i * 3) % 12].id.clone()).collect()).collect() } else { vec![fixed.clone()] };
+        let (mut n, mut win, mut tt) = (0u32, 0u32, 0.0f64); let mut times: Vec<f64> = vec![]; let mut by_class = serde_json::Map::new(); let mut end_min = std::collections::BTreeMap::<u32, u32>::new();
+        for party in &parties {
+            let mut cw = 0u32;
+            for seed in seed0 + 1..=seed0 + seeds {
+                let players = party.iter().zip(&lvls).map(|(c, &l)| input(c, l)).collect();
+                let mut sim = Sim::new(seed, &dun, players);
+                while sim.over.is_none() && (sim.tick as f64) * data().consts.dt < 900.0 { for pi in 0..sim.players.len() { if idle { let id = sim.players[pi].id; sim.set_input(id, 0.0, 0.0); } else { bot_step(&mut sim, pi); } } sim.step(); }
+                let o = sim.over.unwrap(); n += 1; tt += o.time; times.push(o.time);
+                if o.cleared { win += 1; cw += 1; } else { *end_min.entry((o.time / 60.0) as u32).or_insert(0) += 1; }
+            }
+            by_class.insert(party[0].clone(), serde_json::json!(cw * 100 / seeds));
+        }
+        times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        println!("{}", serde_json::json!({"dun": dun, "lvls": lvls, "classes": fixed, "bot": if idle { "idle" } else { "normal" }, "runs": n, "clear_pct": (win as f64 * 1000.0 / n as f64).round() / 10.0,
+            "avg_time_s": (tt / n as f64).round(), "median_time_s": times[times.len() / 2].round(), "deaths_by_minute": end_min, "clear_by_lead_class_pct": if fixed.is_empty() { serde_json::Value::Object(by_class) } else { serde_json::Value::Null }}));
+    }
+
     /// cargo test --release balance -- --ignored --nocapture  (same matrix as tools/balance.js)
     #[test]
     #[ignore]
