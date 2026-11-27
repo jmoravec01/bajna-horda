@@ -1193,12 +1193,15 @@ mod tests {
         let scen: [(&str, &str, &[u32]); 8] = [("s1 lvl1", "s1", &[1]), ("s2 lvl8", "s2", &[8]), ("s3 lvl18", "s3", &[18]), ("m1 2x lvl5", "m1", &[5, 5]), ("m2 3x lvl12", "m2", &[12, 12, 12]), ("m3 4x lvl25", "m3", &[25, 25, 25, 25]), ("r1 4x lvl40", "r1", &[40, 40, 40, 40]), ("m1 lvl1+lvl20", "m1", &[1, 20])];
         for (label, dun, lvls) in scen {
             let (mut win, mut n, mut tt) = (0, 0, 0.0);
-            for (ci, c) in data().classes.iter().enumerate() { for seed in 1..=2u32 {
+            let seeds: u32 = std::env::var("HORDE_SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);   // HORDE_SEEDS=25 -> 25 runs per class
+            let seed0: u32 = std::env::var("HORDE_SEED0").ok().and_then(|v| v.parse().ok()).unwrap_or(0);   // HORDE_SEED0=100: seeds 101.. (parallel workers use different ranges)
+            let mut by_class = String::new();
+            for (ci, c) in data().classes.iter().enumerate() { let mut cw = 0; for seed in seed0 + 1..=seed0 + seeds {
                 let players = lvls.iter().enumerate().map(|(i, &l)| input(&data().classes[(ci + i * 3) % 12].id, l)).collect();
                 let sim = run_bot(dun, players, seed); let o = sim.over.unwrap();
-                n += 1; tt += o.time; if o.cleared { win += 1; }
-            } }
-            println!("{label:<16} clear {}%  avg time {}s", win * 100 / n, (tt / n as f64).round());
+                n += 1; tt += o.time; if o.cleared { win += 1; cw += 1; }
+            } by_class += &format!(" {}={}%", c.id, cw * 100 / seeds); }
+            println!("{label:<16} runs {n} clear {}%  avg time {}s  by class:{by_class}", win * 100 / n, (tt / n as f64).round());
         }
         let _ = new_char(1, "x", "perun");
     }
