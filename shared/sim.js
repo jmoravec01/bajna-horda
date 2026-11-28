@@ -234,7 +234,7 @@ export class Sim {
     const st = BOSS_STAGES[this.bossN];
     if (st && T >= st.at) { this.spawn(alive, 6 + this.bossN, true); this.bossN++; this.emit('B', this.bossN); }
     const ramp = Math.min(Tp, 480) / 60;
-    let rate = (0.7 + 0.9 * ramp) * this.cMul * (this.enemies.some((e) => e.boss && !e.dead) ? 0.5 : 1);
+    let rate = (0.7 + 0.9 * ramp) * this.cMul * d.spawn * (this.enemies.some((e) => e.boss && !e.dead) ? 0.5 : 1);
     const cap = Math.round((60 + 22 * ramp) * (1 + 0.5 * (n - 1)));
     this.spawnAcc += rate * DT;
     while (this.spawnAcc >= 1) {
@@ -261,7 +261,7 @@ export class Sim {
     const Tp = T * PACE, tsHp = 1 + Tp / 60 * 0.6, tsDmg = 1 + Tp / 60 * 0.12;
     const hp = hpBase * (boss ? 1 : tsHp) * this.eMul * d.diff;
     const e = { id: this.nid++, type: idx, arch, beh: arch.beh, x: target.x + Math.cos(a) * dist, y: target.y + Math.sin(a) * dist,
-      hp, maxHp: hp, dmg: arch.dmg * (boss ? 1.3 * bst.dmg : 1) * tsDmg * this.dMul * Math.sqrt(d.diff), spd: arch.spd * (boss ? 0.8 : 1) * (1 + this.rnd() * 0.12), r: arch.r * scale, xp: arch.xp * (elite ? 6 : 1),
+      hp, maxHp: hp, dmg: arch.dmg * (boss ? 1.3 * bst.dmg : 1) * tsDmg * this.dMul * Math.sqrt(d.diff) * d.hit, spd: arch.spd * (boss ? 0.8 : 1) * (1 + this.rnd() * 0.12), r: arch.r * scale, xp: arch.xp * (elite ? 6 : 1),
       kx: 0, ky: 0, t: this.rnd() * 3, dead: false, flash: 0, slowUntil: 0, slowF: 0, freezeUntil: 0, hm: null, boss, elite, big: arch.r * scale >= 8, st: 0, dashX: 0, dashY: 0 };
     if (boss) { e.beh = 'boss'; e.bt = 3; e.bs = bst.every; e.xp = 0; e.stage = idx - 6; }
     this.enemies.push(e);
